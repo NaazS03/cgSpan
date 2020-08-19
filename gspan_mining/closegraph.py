@@ -25,6 +25,74 @@ def record_timestamp(func):
         self.timestamps[func.__name__ + '_out'] = time.time()
     return deco
 
+# Start Close Graph specific classes
+class DFSlabels(object):
+    def __init__(self, frmlbl, edgelbl, tolbl):
+        """Initialize DFSlabel instance."""
+        self.frmlbl = frmlbl
+        self.edgelbl = edgelbl
+        self.tolbl = tolbl
+
+    def __repr__(self):
+        """Represent DFSlabel in string way."""
+        return '(frmlbl={}, edgelbl={}, tolbl={})'.format(
+            self.frmlbl, self.edgelbl, self.tolbl
+        )
+
+    def __eq__(self, other):
+        """Check equivalence of DFSlabels."""
+        return (self.frmlbl == other.frmlbl and
+                self.edgelbl == other.edgelbl and
+                self.tolbl == other.tolbl)
+
+    def __ne__(self, other):
+        """Check if not equal."""
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(hash(self.frmlbl) + hash(self.edgelbl) + hash(self.tolbl))
+
+class ProjectedEdge(object):
+    def __init__(self, originalGraphId, edgeId):
+        """Initialize ProjectedEdge instance."""
+        self.originalGraphId = originalGraphId
+        self.edgeId = edgeId
+
+    def __repr__(self):
+        """Represent ProjectedEdge in string way."""
+        return '(originalGraphId={}, edgeId={})'.format(
+            self.originalGraphId, self.edgeId
+        )
+
+    def __eq__(self, other):
+        """Check equivalence of ProjectedEdge."""
+        return (self.originalGraphId == other.originalGraphId and
+                self.edgeId == other.edgeId)
+
+    def __ne__(self, other):
+        """Check if not equal."""
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(hash(self.originalGraphId) + hash(self.edgeId))
+
+#
+#     def __iter__(self):
+#         """Returns the Iterator object"""
+#         return ProjectedEdgeIterator(self)
+#
+# class ProjectedEdgeIterator:
+#     def __init__(self, projected_edge):
+#         self._projected_edge = projected_edge
+#         self._index = -1
+#
+#     def __next__(self):
+#         self._index += 1
+#         if self._index < len(self._projected_edge):
+#             result = self._projected_Edge
+
+# End Close Graph specific classes
+
 
 class DFSedge(object):
     """DFSedge class."""
@@ -179,7 +247,7 @@ class History(object):
         return self.edges_used[eid] == 1
 
 
-class gSpan(object):
+class closeGraph(object):
     """`closeGraph` algorithm."""
 
     def __init__(self,
@@ -217,6 +285,7 @@ class gSpan(object):
                   'Set max_num_vertices = min_num_vertices.')
             self._max_num_vertices = self._min_num_vertices
         self._report_df = pd.DataFrame()
+        self._DFSlabels_dict = dict() #DFSlabels -> set( set(ProjectedEdges) )
 
     def time_stats(self):
         """Print stats of time."""
@@ -510,7 +579,8 @@ class gSpan(object):
             return
         if not self._is_min():
             return
-        self._report(projected)
+        should_terminate_early = not self._update_dfslabels_dictionary(projected)
+        if(should_terminate_early): return
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()
@@ -575,4 +645,42 @@ class gSpan(object):
             self._subgraph_mining(forward_root[(frm, elb, vlb2)])
             self._DFScode.pop()
 
+        if len(forward_root.items()) == 0 and len(backward_root.items()) == 0:
+            self._report(projected)
         return self
+
+    def _update_dfslabels_dictionary(self,projected):
+        """
+        Returns 1 if the dictionary was updated, 0 otherwise
+        If 0 is returned, early termination is necessary
+        """
+
+        # Collect projected_edges
+        projected_edges = []
+        for pdfs in projected:
+            g = self.graphs[pdfs.gid]
+            edge = pdfs.edge
+            new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
+            projected_edges.append(new_proj_edge)
+
+        # Construct DFSlabels object
+        frmlbl = g.vertices[edge.frm].vlb
+        edgelbl = edge.elb
+        tolbl = g.vertices[edge.to].vlb
+        dfs_labels = DFSlabels(frmlbl=frmlbl, edgelbl=edgelbl, tolbl=tolbl)
+
+        # Update DFSlabels dictionary to reference new projected edge
+        set_of_proj_edges = frozenset(projected_edges)
+        if dfs_labels not in self._DFSlabels_dict:
+            set_of_sets = set()
+            set_of_sets.add(set_of_proj_edges)
+            # Structure of DFSlabels_dict is DFSlabels -> set(frozenset(ProjectedEdges))
+            self._DFSlabels_dict[dfs_labels] = set_of_sets
+        else:
+            set_of_sets = self._DFSlabels_dict[dfs_labels]
+            if set_of_proj_edges in set_of_sets:
+                return 0  # Early Termination case
+            else:
+                set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
+        return 1
+
