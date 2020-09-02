@@ -41,9 +41,8 @@ class DFSlabels(object):
 
     def __eq__(self, other):
         """Check equivalence of DFSlabels."""
-        return (self.frmlbl == other.frmlbl and
-                self.edgelbl == other.edgelbl and
-                self.tolbl == other.tolbl)
+        return ((self.frmlbl == other.frmlbl and self.edgelbl == other.edgelbl and self.tolbl == other.tolbl) or
+               (self.frmlbl == other.tolbl and self.edgelbl == other.edgelbl and self.tolbl == other.frmlbl))
 
     def __ne__(self, other):
         """Check if not equal."""
@@ -75,22 +74,6 @@ class ProjectedEdge(object):
 
     def __hash__(self):
         return hash(hash(self.originalGraphId) + hash(self.edgeId))
-
-#
-#     def __iter__(self):
-#         """Returns the Iterator object"""
-#         return ProjectedEdgeIterator(self)
-#
-# class ProjectedEdgeIterator:
-#     def __init__(self, projected_edge):
-#         self._projected_edge = projected_edge
-#         self._index = -1
-#
-#     def __next__(self):
-#         self._index += 1
-#         if self._index < len(self._projected_edge):
-#             result = self._projected_Edge
-
 # End Close Graph specific classes
 
 
@@ -286,6 +269,7 @@ class closeGraph(object):
             self._max_num_vertices = self._min_num_vertices
         self._report_df = pd.DataFrame()
         self._DFSlabels_dict = dict() #DFSlabels -> set( set(ProjectedEdges) )
+        self._report_df_cumulative = pd.DataFrame()
 
     def time_stats(self):
         """Print stats of time."""
@@ -356,8 +340,8 @@ class closeGraph(object):
                           is_undirected=self._is_undirected)
                 g.add_vertex(0, vlb)
                 self._frequent_size1_subgraphs.append(g)
-                if self._min_num_vertices <= 1:
-                    self._report_size1(g, support=cnt)
+                # if self._min_num_vertices <= 1:
+                    # self._report_size1(g, support=cnt)
             else:
                 continue
         if self._min_num_vertices > 1:
@@ -389,8 +373,15 @@ class closeGraph(object):
 
     def _report_size1(self, g, support):
         g.display()
-        print('\nSupport: {}'.format(support))
-        print('\n-----------------\n')
+        line1 = '\nSupport: {}'.format(support)
+        line2 = '\n-----------------\n'
+
+        # self._final_report += line1
+        # self._final_report += line2
+
+        print(line1)
+        print(line2)
+
 
     def _report(self, projected):
         self._frequent_subgraphs.append(copy.copy(self._DFScode))
@@ -580,7 +571,7 @@ class closeGraph(object):
         if not self._is_min():
             return
         should_terminate_early = not self._update_dfslabels_dictionary(projected)
-        if(should_terminate_early): return
+        if should_terminate_early: return
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()
@@ -637,7 +628,10 @@ class closeGraph(object):
         # forward
         # No need to check if num_vertices >= self._max_num_vertices.
         # Because forward_root has no element.
-        for frm, elb, vlb2 in forward_root:
+        # for frm, elb, vlb2 in forward_root:
+        forward_root_keys = sorted(forward_root.keys())
+        # for frm, elb, vlb2 in forward_root: #Going through forward edges is not sorted here, it might need to be in the future
+        for frm, elb, vlb2 in forward_root_keys: #Going through forward edges is sorted here
             self._DFScode.append(DFSedge(
                 frm, maxtoc + 1,
                 (VACANT_VERTEX_LABEL, elb, vlb2))
