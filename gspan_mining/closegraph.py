@@ -570,8 +570,8 @@ class closeGraph(object):
             return
         if not self._is_min():
             return
-        should_terminate_early = not self._update_dfslabels_dictionary(projected)
-        if should_terminate_early: return
+        if self._terminate_early(projected):
+            return
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()
@@ -617,6 +617,7 @@ class closeGraph(object):
                          e.elb, g.vertices[e.to].vlb)
                     ].append(PDFS(g.gid, e, p))
 
+        output = True
         # backward
         for to, elb in backward_root:
             self._DFScode.append(DFSedge(
@@ -624,34 +625,69 @@ class closeGraph(object):
                 (VACANT_VERTEX_LABEL, elb, VACANT_VERTEX_LABEL))
             )
             self._subgraph_mining(backward_root[(to, elb)])
+            #check support of graph and of backward_edge
+            #if different set output to false
             self._DFScode.pop()
         # forward
         # No need to check if num_vertices >= self._max_num_vertices.
         # Because forward_root has no element.
-        # for frm, elb, vlb2 in forward_root:
-        forward_root_keys = sorted(forward_root.keys())
-        # for frm, elb, vlb2 in forward_root: #Going through forward edges is not sorted here, it might need to be in the future
-        for frm, elb, vlb2 in forward_root_keys: #Going through forward edges is sorted here
+        forward_root_sorted = [(frm, elb, vlb2) for frm, elb, vlb2 in forward_root]
+        forward_root_sorted.sort(key=lambda x: (-x[0], x[1], x[2]))
+        for frm, elb, vlb2 in forward_root_sorted:
             self._DFScode.append(DFSedge(
                 frm, maxtoc + 1,
                 (VACANT_VERTEX_LABEL, elb, vlb2))
             )
             self._subgraph_mining(forward_root[(frm, elb, vlb2)])
+            #check support of graph and of forward_edge
+            #if different set output to false
             self._DFScode.pop()
 
+        # if output ...
         if len(forward_root.items()) == 0 and len(backward_root.items()) == 0:
+            #before reporting update the dictionary
+            self._add_subgraph_dfslabels_to_dictionary(projected)
             self._report(projected)
         return self
 
-    def _update_dfslabels_dictionary(self,projected):
+    def _terminate_early(self, projected):
         """
-        Returns 1 if the dictionary was updated, 0 otherwise
-        If 0 is returned, early termination is necessary
+        Checks if the subgraph mining should end early.
         """
+        # Collect projected_edges
+        projected_edges = []
+        for pdfs in projected:
+            g = self.graphs[pdfs.gid]
+            edge = pdfs.edge
+            new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
+            projected_edges.append(new_proj_edge)
+
+        # Construct DFSlabels object
+        frmlbl = g.vertices[edge.frm].vlb
+        edgelbl = edge.elb
+        tolbl = g.vertices[edge.to].vlb
+        dfs_labels = DFSlabels(frmlbl=frmlbl, edgelbl=edgelbl, tolbl=tolbl)
+
+        # Update DFSlabels dictionary to reference new projected edge
+        set_of_proj_edges = frozenset(projected_edges)
+        if dfs_labels not in self._DFSlabels_dict:
+            return False
+        else:
+            set_of_sets = self._DFSlabels_dict[dfs_labels]
+            if set_of_proj_edges in set_of_sets:
+                return True  # Early Termination case
+            else:
+                return False
+
+    def _add_subgraph_dfslabels_to_dictionary(self, projected):
+        if projected is None:
+            return
 
         # Collect projected_edges
         projected_edges = []
         for pdfs in projected:
+            if pdfs is None:
+                return
             g = self.graphs[pdfs.gid]
             edge = pdfs.edge
             new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
@@ -672,9 +708,49 @@ class closeGraph(object):
             self._DFSlabels_dict[dfs_labels] = set_of_sets
         else:
             set_of_sets = self._DFSlabels_dict[dfs_labels]
-            if set_of_proj_edges in set_of_sets:
-                return 0  # Early Termination case
-            else:
+            if set_of_proj_edges not in set_of_sets:
                 set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
-        return 1
+
+        headless_projected = self._remove_head_from_projected_pdfs(projected)
+        self._add_subgraph_dfslabels_to_dictionary(headless_projected)
+
+    def _remove_head_from_projected_pdfs(self, projected):
+        for pdf_index in range(len(projected)):
+            projected[pdf_index] = projected[pdf_index].prev
+
+        return projected
+
+    # def _update_dfslabels_dictionary(self,projected):
+    #     """
+    #     Adds every edge in the provided subgraph to the DFSlabels dictionary
+    #     """
+    #
+    #     # Collect projected_edges
+    #     projected_edges = []
+    #     for pdfs in projected:
+    #         g = self.graphs[pdfs.gid]
+    #         edge = pdfs.edge
+    #         new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
+    #         projected_edges.append(new_proj_edge)
+    #
+    #     # Construct DFSlabels object
+    #     frmlbl = g.vertices[edge.frm].vlb
+    #     edgelbl = edge.elb
+    #     tolbl = g.vertices[edge.to].vlb
+    #     dfs_labels = DFSlabels(frmlbl=frmlbl, edgelbl=edgelbl, tolbl=tolbl)
+    #
+    #     # Update DFSlabels dictionary to reference new projected edge
+    #     set_of_proj_edges = frozenset(projected_edges)
+    #     if dfs_labels not in self._DFSlabels_dict:
+    #         set_of_sets = set()
+    #         set_of_sets.add(set_of_proj_edges)
+    #         # Structure of DFSlabels_dict is DFSlabels -> set(frozenset(ProjectedEdges))
+    #         self._DFSlabels_dict[dfs_labels] = set_of_sets
+    #     else:
+    #         set_of_sets = self._DFSlabels_dict[dfs_labels]
+    #         if set_of_proj_edges in set_of_sets:
+    #             return 0  # Early Termination case
+    #         else:
+    #             set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
+    #     return 1
 

@@ -96,12 +96,21 @@ class CloseGraphTests(unittest.TestCase):
         )
         cg.run()
 
-        result = cg._report_df.to_numpy().astype(str)
-        answer = np.array(['2','v 0 A v 1 B v 2 C v 3 D v 4 E e 0 1 z e 0 3 y e 1 2 x e 3 4 w ','5']).reshape((1,-1))
+        results = cg._report_df.to_numpy().astype(str)
+        solution_1 = np.array(['2','v 0 A v 1 B v 2 C e 0 1 x e 0 2 z e 1 2 y ','3']).reshape((1,-1))
+        solution_2 = np.array(['3','v 0 A v 1 B v 2 C e 0 1 x e 1 2 y ','3']).reshape((1,-1))
+        solutions = [solution_1, solution_2]
 
-        self.assertEqual(answer[0][0], result[0][0])
-        self.assertEqual(answer[0][1], result[0][1])
-        self.assertEqual(answer[0][2], result[0][2])
+        for result_1d in results:
+            for solution_index in range(0, len(solutions)):
+                solution = solutions[solution_index]
+                if solution[0][0] == result_1d[0] and solution[0][1] == result_1d[1] and solution[0][2] == result_1d[2]:
+                    self.assertTrue(True, "The proposed answer matches an existing solution.")
+                    del solutions[solution_index]
+                    break
+
+        if len(solutions) != 0:
+            self.assertTrue(False, "All possible solutions were not found")
 
 
 if __name__ == '__main__':
