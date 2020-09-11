@@ -363,9 +363,11 @@ class closeGraph(object):
                         PDFS(gid, e, None)
                     )
 
-        for vevlb, projected in root.items():
+        vevlbs = list(root.keys())
+        vevlbs.sort()
+        for vevlb in vevlbs:
             self._DFScode.append(DFSedge(0, 1, vevlb))
-            self._subgraph_mining(projected)
+            self._subgraph_mining(root[vevlb])
             self._DFScode.pop()
 
     def _get_support(self, projected):
@@ -628,6 +630,7 @@ class closeGraph(object):
             #check support of graph and of backward_edge
             #if different set output to false
             self._DFScode.pop()
+
         # forward
         # No need to check if num_vertices >= self._max_num_vertices.
         # Because forward_root has no element.
@@ -719,38 +722,4 @@ class closeGraph(object):
             projected[pdf_index] = projected[pdf_index].prev
 
         return projected
-
-    # def _update_dfslabels_dictionary(self,projected):
-    #     """
-    #     Adds every edge in the provided subgraph to the DFSlabels dictionary
-    #     """
-    #
-    #     # Collect projected_edges
-    #     projected_edges = []
-    #     for pdfs in projected:
-    #         g = self.graphs[pdfs.gid]
-    #         edge = pdfs.edge
-    #         new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
-    #         projected_edges.append(new_proj_edge)
-    #
-    #     # Construct DFSlabels object
-    #     frmlbl = g.vertices[edge.frm].vlb
-    #     edgelbl = edge.elb
-    #     tolbl = g.vertices[edge.to].vlb
-    #     dfs_labels = DFSlabels(frmlbl=frmlbl, edgelbl=edgelbl, tolbl=tolbl)
-    #
-    #     # Update DFSlabels dictionary to reference new projected edge
-    #     set_of_proj_edges = frozenset(projected_edges)
-    #     if dfs_labels not in self._DFSlabels_dict:
-    #         set_of_sets = set()
-    #         set_of_sets.add(set_of_proj_edges)
-    #         # Structure of DFSlabels_dict is DFSlabels -> set(frozenset(ProjectedEdges))
-    #         self._DFSlabels_dict[dfs_labels] = set_of_sets
-    #     else:
-    #         set_of_sets = self._DFSlabels_dict[dfs_labels]
-    #         if set_of_proj_edges in set_of_sets:
-    #             return 0  # Early Termination case
-    #         else:
-    #             set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
-    #     return 1
 
