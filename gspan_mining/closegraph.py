@@ -618,8 +618,9 @@ class closeGraph(object):
                         (self._DFScode[rmpath_i].frm,
                          e.elb, g.vertices[e.to].vlb)
                     ].append(PDFS(g.gid, e, p))
-
+        # Begin edge mining
         output = True
+
         # backward
         for to, elb in backward_root:
             self._DFScode.append(DFSedge(
@@ -627,13 +628,15 @@ class closeGraph(object):
                 (VACANT_VERTEX_LABEL, elb, VACANT_VERTEX_LABEL))
             )
             self._subgraph_mining(backward_root[(to, elb)])
-            #check support of graph and of backward_edge
-            #if different set output to false
+
+            #check support of graph and of backward_edge and if the same then set output to false
+            following_projection = backward_root[(to,elb)]
+            if self._should_output(projected,following_projection) is False:
+                output = False
+
             self._DFScode.pop()
 
         # forward
-        # No need to check if num_vertices >= self._max_num_vertices.
-        # Because forward_root has no element.
         forward_root_sorted = [(frm, elb, vlb2) for frm, elb, vlb2 in forward_root]
         forward_root_sorted.sort(key=lambda x: (-x[0], x[1], x[2]))
         for frm, elb, vlb2 in forward_root_sorted:
@@ -642,14 +645,17 @@ class closeGraph(object):
                 (VACANT_VERTEX_LABEL, elb, vlb2))
             )
             self._subgraph_mining(forward_root[(frm, elb, vlb2)])
-            #check support of graph and of forward_edge
-            #if different set output to false
+
+            #check support of graph and of forward_edge and if the same then set output to false
+            following_projection = forward_root[(frm,elb,vlb2)]
+            if self._should_output(projected,following_projection) is False:
+                output = False
+
             self._DFScode.pop()
 
-        # if output ...
-        if len(forward_root.items()) == 0 and len(backward_root.items()) == 0:
-            #before reporting update the dictionary
-            self._add_subgraph_dfslabels_to_dictionary(projected)
+        search_exhausted = len(forward_root.items()) == 0 and len(backward_root.items()) == 0
+        if output or search_exhausted:
+            self._add_subgraph_dfslabels_to_dictionary(projected) #before reporting update the dictionary
             self._report(projected)
         return self
 
@@ -723,3 +729,22 @@ class closeGraph(object):
 
         return projected
 
+    def _is_projection_of_nones(self,projected):
+        """
+        Checks if the given projection is full of pdfs of None
+        returns True if yes, returns False if no
+        """
+        for pdf in projected:
+            if pdf is not None:
+                return False
+        return True
+
+    def _should_output(self,current_projection,following_projection):
+        if self._is_projection_of_nones(following_projection):
+            return False
+
+        following_projection_support = self._get_support(following_projection)
+        if self._get_support(current_projection) == following_projection_support:
+            return False # if the supports are the same, then do NOT output
+
+        return True
