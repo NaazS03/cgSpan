@@ -657,37 +657,18 @@ class closeGraph(object):
             self._report(projected)
         return self
 
-    def _collect_projected_edges(self,projected):
-        projected_edges = []
-        for pdfs in projected:
-            g = self.graphs[pdfs.gid]
-            edge = pdfs.edge
-            new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
-            projected_edges.append(new_proj_edge)
-        return projected_edges
-
-    def _get_a_graph_from_projected(self,projected):
-        return self.graphs[projected[-1].gid]
-
     def _terminate_early(self, projected):
         """
         Checks if the subgraph mining should end early.
         """
-        # Collect projected_edges
-        projected_edges = []
-        for pdfs in projected:
-            g = self.graphs[pdfs.gid]
-            edge = pdfs.edge
-            new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
-            projected_edges.append(new_proj_edge)
 
-        # Construct DFSlabels object
-        frmlbl = g.vertices[edge.frm].vlb
-        edgelbl = edge.elb
-        tolbl = g.vertices[edge.to].vlb
-        dfs_labels = DFSlabels(frmlbl=frmlbl, edgelbl=edgelbl, tolbl=tolbl)
+        projected_edges,g,edge = self._collect_projected_edges(projected)
+        frmlbl,edgelbl,tolbl = self._get_DFSLabels(g, edge)
+        frmlbl_norm,tolbl_norm = self._normalize_DFSLabels(frmlbl,tolbl)
+        dfs_labels = DFSlabels(frmlbl=frmlbl_norm, edgelbl=edgelbl, tolbl=tolbl_norm)
 
-        # Update DFSlabels dictionary to reference new projected edge
+        # Check if set of projected edges already exists in the values of the specified key
+        # return true if yes, false otherwise
         set_of_proj_edges = frozenset(projected_edges)
         if dfs_labels not in self._DFSlabels_dict:
             return False
@@ -699,30 +680,19 @@ class closeGraph(object):
                 return False
 
     def _add_subgraph_dfslabels_to_dictionary(self, projected):
+        """
+        Recursively adds the edges in the provided subgraph to the DFSLabels dictionary
+        """
         if projected is None:
             return
 
-        # Collect projected_edges
-        projected_edges = []
-        for pdfs in projected:
-            if pdfs is None:
+        for pdf in projected:
+            if pdf is None:
                 return
-            g = self.graphs[pdfs.gid]
-            edge = pdfs.edge
-            new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
-            projected_edges.append(new_proj_edge)
 
-    # Construct DFSlabels object that will be used as the key in the dictionary
-        #Get dfslabel details
-        frmlbl = g.vertices[edge.frm].vlb
-        edgelbl = edge.elb
-        tolbl = g.vertices[edge.to].vlb
-
-        #normalize from and to labels because we are dealing with undirected graphs only
-        frmlbl_norm = min(frmlbl,tolbl)
-        tolbl_norm = max(frmlbl,tolbl)
-
-        #Create the DFSLabel object
+        projected_edges, g, edge = self._collect_projected_edges(projected)
+        frmlbl, edgelbl, tolbl = self._get_DFSLabels(g, edge)
+        frmlbl_norm, tolbl_norm = self._normalize_DFSLabels(frmlbl, tolbl)
         dfs_labels = DFSlabels(frmlbl=frmlbl_norm, edgelbl=edgelbl, tolbl=tolbl_norm)
 
         # Update DFSlabels dictionary to reference new projected edge
@@ -737,6 +707,7 @@ class closeGraph(object):
             if set_of_proj_edges not in set_of_sets:
                 set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
 
+        #Recursively add the edges in the subgraph to the dictionary
         projected_copy = copy.deepcopy(projected)
         headless_projected = self._remove_head_from_projected_pdfs(projected_copy)
         self._add_subgraph_dfslabels_to_dictionary(headless_projected)
@@ -753,3 +724,23 @@ class closeGraph(object):
             return False # if the supports are the same, then do NOT output
 
         return True
+
+    def _collect_projected_edges(self,projected):
+        projected_edges = []
+        for pdfs in projected:
+            g = self.graphs[pdfs.gid]
+            edge = pdfs.edge
+            new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
+            projected_edges.append(new_proj_edge)
+        return projected_edges,g,edge
+
+    def _get_DFSLabels(self,g,edge):
+        frmlbl = g.vertices[edge.frm].vlb
+        edgelbl = edge.elb
+        tolbl = g.vertices[edge.to].vlb
+        return frmlbl,edgelbl,tolbl
+
+    def _normalize_DFSLabels(self,frmlbl,tolbl):
+        frmlbl_norm = min(frmlbl,tolbl)
+        tolbl_norm = max(frmlbl,tolbl)
+        return frmlbl_norm,tolbl_norm
