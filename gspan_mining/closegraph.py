@@ -392,7 +392,8 @@ class closeGraph(object):
         g = self._DFScode.to_graph(gid=next(self._counter),
                                    is_undirected=self._is_undirected)
         display_str = g.display()
-        print('\nSupport: {}'.format(self._support))
+        # print('\nSupport: {}'.format(self._support))
+        print('\nSupport: {}'.format(self._get_support(projected)))
 
         # Add some report info to pandas dataframe "self._report_df".
         self._report_df = self._report_df.append(
@@ -618,7 +619,7 @@ class closeGraph(object):
                         (self._DFScode[rmpath_i].frm,
                          e.elb, g.vertices[e.to].vlb)
                     ].append(PDFS(g.gid, e, p))
-        # Begin edge mining
+        # Begin searching through forward and backward edges
         output = True
 
         # backward
@@ -627,10 +628,9 @@ class closeGraph(object):
                 maxtoc, to,
                 (VACANT_VERTEX_LABEL, elb, VACANT_VERTEX_LABEL))
             )
-            self._subgraph_mining(backward_root[(to, elb)])
-
-            #check support of graph and of backward_edge and if the same then set output to false
             following_projection = backward_root[(to,elb)]
+
+            self._subgraph_mining(following_projection)
             if self._should_output(projected,following_projection) is False:
                 output = False
 
@@ -644,20 +644,30 @@ class closeGraph(object):
                 frm, maxtoc + 1,
                 (VACANT_VERTEX_LABEL, elb, vlb2))
             )
-            self._subgraph_mining(forward_root[(frm, elb, vlb2)])
-
-            #check support of graph and of forward_edge and if the same then set output to false
             following_projection = forward_root[(frm,elb,vlb2)]
+
+            self._subgraph_mining(following_projection)
             if self._should_output(projected,following_projection) is False:
                 output = False
 
             self._DFScode.pop()
 
-        search_exhausted = len(forward_root.items()) == 0 and len(backward_root.items()) == 0
-        if output or search_exhausted:
+        if output:
             self._add_subgraph_dfslabels_to_dictionary(projected) #before reporting update the dictionary
             self._report(projected)
         return self
+
+    def _collect_projected_edges(self,projected):
+        projected_edges = []
+        for pdfs in projected:
+            g = self.graphs[pdfs.gid]
+            edge = pdfs.edge
+            new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
+            projected_edges.append(new_proj_edge)
+        return projected_edges
+
+    def _get_a_graph_from_projected(self,projected):
+        return self.graphs[projected[-1].gid]
 
     def _terminate_early(self, projected):
         """
@@ -702,11 +712,18 @@ class closeGraph(object):
             new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
             projected_edges.append(new_proj_edge)
 
-        # Construct DFSlabels object
+    # Construct DFSlabels object that will be used as the key in the dictionary
+        #Get dfslabel details
         frmlbl = g.vertices[edge.frm].vlb
         edgelbl = edge.elb
         tolbl = g.vertices[edge.to].vlb
-        dfs_labels = DFSlabels(frmlbl=frmlbl, edgelbl=edgelbl, tolbl=tolbl)
+
+        #normalize from and to labels because we are dealing with undirected graphs only
+        frmlbl_norm = min(frmlbl,tolbl)
+        tolbl_norm = max(frmlbl,tolbl)
+
+        #Create the DFSLabel object
+        dfs_labels = DFSlabels(frmlbl=frmlbl_norm, edgelbl=edgelbl, tolbl=tolbl_norm)
 
         # Update DFSlabels dictionary to reference new projected edge
         set_of_proj_edges = frozenset(projected_edges)
@@ -720,7 +737,8 @@ class closeGraph(object):
             if set_of_proj_edges not in set_of_sets:
                 set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
 
-        headless_projected = self._remove_head_from_projected_pdfs(projected)
+        projected_copy = copy.deepcopy(projected)
+        headless_projected = self._remove_head_from_projected_pdfs(projected_copy)
         self._add_subgraph_dfslabels_to_dictionary(headless_projected)
 
     def _remove_head_from_projected_pdfs(self, projected):
@@ -729,20 +747,7 @@ class closeGraph(object):
 
         return projected
 
-    def _is_projection_of_nones(self,projected):
-        """
-        Checks if the given projection is full of pdfs of None
-        returns True if yes, returns False if no
-        """
-        for pdf in projected:
-            if pdf is not None:
-                return False
-        return True
-
     def _should_output(self,current_projection,following_projection):
-        if self._is_projection_of_nones(following_projection):
-            return False
-
         following_projection_support = self._get_support(following_projection)
         if self._get_support(current_projection) == following_projection_support:
             return False # if the supports are the same, then do NOT output
