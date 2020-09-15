@@ -399,7 +399,7 @@ class closeGraph(object):
         self._report_df = self._report_df.append(
             pd.DataFrame(
                 {
-                    'support': [self._support],
+                    'support': self._get_support(projected), #[self._support],
                     'description': [display_str],
                     'num_vert': self._DFScode.get_num_vertices()
                 },
