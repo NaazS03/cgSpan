@@ -57,6 +57,29 @@ class Vertex(object):
         """Add an outgoing edge."""
         self.edges[to] = Edge(eid, frm, to, elb)
 
+class ProjectedEdge(object):
+    def __init__(self, originalGraphId, edgeId):
+        """Initialize ProjectedEdge instance."""
+        self.originalGraphId = originalGraphId
+        self.edgeId = edgeId
+
+    def __repr__(self):
+        """Represent ProjectedEdge in string way."""
+        return '(originalGraphId={}, edgeId={})'.format(
+            self.originalGraphId, self.edgeId
+        )
+
+    def __eq__(self, other):
+        """Check equivalence of ProjectedEdge."""
+        return (self.originalGraphId == other.originalGraphId and
+                self.edgeId == other.edgeId)
+
+    def __ne__(self, other):
+        """Check if not equal."""
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(hash(self.originalGraphId) + hash(self.edgeId))
 
 class Graph(object):
     """Graph class."""
@@ -79,6 +102,7 @@ class Graph(object):
         self.set_of_vlb = collections.defaultdict(set)
         self.eid_auto_increment = eid_auto_increment
         self.counter = itertools.count()
+        self.projected_edges = dict()
 
     def get_num_vertices(self):
         """Return number of vertices in the graph."""
@@ -105,6 +129,7 @@ class Graph(object):
         if self.is_undirected:
             self.vertices[to].add_edge(eid, to, frm, elb)
             self.set_of_elb[elb].add((to, frm))
+        self.projected_edges[eid] = ProjectedEdge(self.gid, eid)
         return self
 
     def display(self):

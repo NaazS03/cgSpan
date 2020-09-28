@@ -8,6 +8,7 @@ import collections
 import copy
 import itertools
 import time
+import enum
 
 from graph import AUTO_EDGE_ID
 from graph import Graph
@@ -24,6 +25,10 @@ def record_timestamp(func):
         func(self)
         self.timestamps[func.__name__ + '_out'] = time.time()
     return deco
+
+class CloseGraphMode(enum.Enum):
+   Normal = 1
+   EarlyTerminationFailure = 2
 
 # Start Close Graph specific classes
 class DFSlabels(object):
@@ -50,30 +55,6 @@ class DFSlabels(object):
 
     def __hash__(self):
         return hash(hash(self.frmlbl) + hash(self.edgelbl) + hash(self.tolbl))
-
-class ProjectedEdge(object):
-    def __init__(self, originalGraphId, edgeId):
-        """Initialize ProjectedEdge instance."""
-        self.originalGraphId = originalGraphId
-        self.edgeId = edgeId
-
-    def __repr__(self):
-        """Represent ProjectedEdge in string way."""
-        return '(originalGraphId={}, edgeId={})'.format(
-            self.originalGraphId, self.edgeId
-        )
-
-    def __eq__(self, other):
-        """Check equivalence of ProjectedEdge."""
-        return (self.originalGraphId == other.originalGraphId and
-                self.edgeId == other.edgeId)
-
-    def __ne__(self, other):
-        """Check if not equal."""
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        return hash(hash(self.originalGraphId) + hash(self.edgeId))
 # End Close Graph specific classes
 
 
@@ -242,7 +223,8 @@ class closeGraph(object):
                  is_undirected=True,
                  verbose=False,
                  visualize=False,
-                 where=False):
+                 where=False,
+                 mode=CloseGraphMode.Normal):
         """Initialize closeGraph instance."""
         self._database_file_name = database_file_name
         self.graphs = dict()
@@ -261,6 +243,7 @@ class closeGraph(object):
         self._verbose = verbose
         self._visualize = visualize
         self._where = where
+        self._mode = mode
         self.timestamps = dict()
         if self._max_num_vertices < self._min_num_vertices:
             print('Max number of vertices can not be smaller than '
@@ -269,6 +252,7 @@ class closeGraph(object):
             self._max_num_vertices = self._min_num_vertices
         self._report_df = pd.DataFrame()
         self._DFSlabels_dict = dict() #DFSlabels -> set( set(ProjectedEdges) )
+        self._DFSlabels_early_termination_failure_dict = dict()
         self._report_df_cumulative = pd.DataFrame()
 
     def time_stats(self):
@@ -287,6 +271,21 @@ class closeGraph(object):
         print('Total:\t{} s'.format(time_deltas['run']))
 
         return self
+
+    def time_stats_early_termination_failure(self):
+        """Print stats of time."""
+        func_names = ['run_early_termination_failure']
+        time_deltas = collections.defaultdict(float)
+        for fn in func_names:
+            time_deltas[fn] = round(
+                self.timestamps[fn + '_out'] - self.timestamps[fn + '_in'],
+                2
+            )
+
+        print('Mine Early Termination Failure:\t{} s'.format(time_deltas['run_early_termination_failure']))
+
+        return self
+
 
     @record_timestamp
     def _read_graphs(self):
@@ -365,6 +364,65 @@ class closeGraph(object):
 
         vevlbs = list(root.keys())
         vevlbs.sort()
+        print("num vevlbs " + str(len(vevlbs)))
+        for vevlb in vevlbs:
+            self._DFScode.append(DFSedge(0, 1, vevlb))
+            self._subgraph_mining(root[vevlb])
+            self._DFScode.pop()
+
+    def _extract_early_termination_failure_graphs_indices(self, DFSlabels_early_termination_failure_dict):
+        graphs_indices = set()
+        for set_of_sets in DFSlabels_early_termination_failure_dict.values():
+            for sett in set_of_sets:
+                for projected_edge in sett:
+                    graphs_indices.add(projected_edge.originalGraphId)
+        return graphs_indices
+
+    def _update_DFSlabels_early_termination_failure_dict_graph_indices(self,
+        DFSlabels_early_termination_failure_dict, early_termination_failure_graphs_indices_reverse_dict):
+        DFSlabels_early_termination_failure_dict_copy = copy.deepcopy(DFSlabels_early_termination_failure_dict)
+
+        for set_of_sets in DFSlabels_early_termination_failure_dict_copy.values():
+            for sett in set_of_sets:
+                for projected_edge in sett:
+                    projected_edge.originalGraphId = early_termination_failure_graphs_indices_reverse_dict[projected_edge.originalGraphId]
+        return DFSlabels_early_termination_failure_dict_copy
+
+    @record_timestamp
+    def run_early_termination_failure(self):
+        cg = self._cg
+        """Run the closeGraph algorithm for early termination failure cases."""
+        DFSlabels_early_termination_failure_dict = cg._DFSlabels_early_termination_failure_dict
+        if len(DFSlabels_early_termination_failure_dict) == 0:
+            return
+        early_termination_failure_graphs_indices = self._extract_early_termination_failure_graphs_indices(DFSlabels_early_termination_failure_dict)
+        self._early_termination_failure_graphs_indices_dict = dict()
+        early_termination_failure_graphs_indices_reverse_dict = dict()
+        graph_idx = 0
+        for original_graph_idx in early_termination_failure_graphs_indices:
+            graph = copy.deepcopy(cg.graphs[original_graph_idx])
+            graph.gid = graph_idx
+            self.graphs[graph_idx] = graph
+            self._early_termination_failure_graphs_indices_dict[graph_idx] = original_graph_idx
+            early_termination_failure_graphs_indices_reverse_dict[original_graph_idx] = graph_idx
+            for projected_edge in graph.projected_edges.values():
+                projected_edge.originalGraphId = graph_idx
+            graph_idx += 1
+        self._DFSlabels_early_termination_failure_dict = self._update_DFSlabels_early_termination_failure_dict_graph_indices(DFSlabels_early_termination_failure_dict, early_termination_failure_graphs_indices_reverse_dict)
+        self._generate_1edge_frequent_subgraphs()
+        if self._max_num_vertices < 2:
+            return
+        root = collections.defaultdict(Projected)
+        for gid, g in self.graphs.items():
+            for vid, v in g.vertices.items():
+                edges = self._get_forward_root_edges(g, vid)
+                for e in edges:
+                    root[(v.vlb, e.elb, g.vertices[e.to].vlb)].append(
+                        PDFS(gid, e, None)
+                    )
+
+        vevlbs = list(root.keys())
+        vevlbs.sort()
         for vevlb in vevlbs:
             self._DFScode.append(DFSedge(0, 1, vevlb))
             self._subgraph_mining(root[vevlb])
@@ -408,8 +466,10 @@ class closeGraph(object):
         )
         if self._visualize:
             g.plot()
-        if self._where:
+        if self._where and self._mode == CloseGraphMode.Normal:
             print('where: {}'.format(list(set([p.gid for p in projected]))))
+        if self._where and self._mode == CloseGraphMode.EarlyTerminationFailure:
+            print('where: {}'.format(list(set([self._early_termination_failure_graphs_indices_dict[p.gid] for p in projected]))))
         print('\n-----------------\n')
 
     def _get_forward_root_edges(self, g, frm):
@@ -567,14 +627,89 @@ class closeGraph(object):
         res = project_is_min(root[min_vevlb])
         return res
 
+    def _add_dfslabel_to_early_termination_failure_dictionary(self, dfs_labels, set_of_proj_edges):
+        if self._mode == CloseGraphMode.EarlyTerminationFailure:
+            return
+        if dfs_labels not in self._DFSlabels_early_termination_failure_dict:
+            set_of_sets = set()
+            set_of_sets.add(set_of_proj_edges)
+            # Structure of DFSlabels_dict is DFSlabels -> set(frozenset(ProjectedEdges))
+            self._DFSlabels_early_termination_failure_dict[dfs_labels] = set_of_sets
+        else:
+            set_of_sets = self._DFSlabels_early_termination_failure_dict[dfs_labels]
+            if set_of_proj_edges not in set_of_sets:
+                set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
+
+    def _early_termination_failure_next(self, projected):
+        if self._mode == CloseGraphMode.EarlyTerminationFailure:
+            return False
+        support = self._get_support(projected)
+        if support < self._min_support:
+            return False
+        if len(self._DFScode) == 2:
+            projected_edges, g, edge = self._collect_projected_edges(projected)
+            frmlbl, edgelbl, tolbl = self._get_DFSLabels(g, edge)
+            frmlbl_norm, tolbl_norm = self._normalize_DFSLabels(frmlbl, tolbl)
+            dfs_labels = DFSlabels(frmlbl=frmlbl_norm, edgelbl=edgelbl, tolbl=tolbl_norm)
+
+            # Check if set of projected edges already exists in the values of the specified key
+            # return true if yes, false otherwise
+            set_of_proj_edges = frozenset(projected_edges)
+            if dfs_labels not in self._DFSlabels_dict:
+                print("early termination failure detected")
+                self._add_dfslabel_to_early_termination_failure_dictionary(dfs_labels, set_of_proj_edges)
+                return True
+            else:
+                set_of_sets = self._DFSlabels_dict[dfs_labels]
+                if set_of_proj_edges in set_of_sets:
+                    return False
+                else:
+                    print("early termination failure detected")
+                    self._add_dfslabel_to_early_termination_failure_dictionary(dfs_labels, set_of_proj_edges)
+                    return True
+        return False
+
+    def _early_termination_failure_prev(self, projected):
+        if self._mode == CloseGraphMode.EarlyTerminationFailure:
+            return False
+        if len(self._DFScode) == 2:
+            projected_prev = Projected()
+            for pdfs in projected:
+                projected_prev.append(pdfs.prev)
+            projected_edges_prev, g, edge_prev = self._collect_projected_edges(projected_prev)
+            frmlbl_prev, edgelbl_prev, tolbl_prev = self._get_DFSLabels(g, edge_prev)
+            frmlbl_norm_prev, tolbl_norm_prev = self._normalize_DFSLabels(frmlbl_prev, tolbl_prev)
+            dfs_labels_prev = DFSlabels(frmlbl=frmlbl_norm_prev, edgelbl=edgelbl_prev, tolbl=tolbl_norm_prev)
+
+            # Check if set of projected edges already exists in the values of the specified key
+            # return true if yes, false otherwise
+            set_of_proj_edges_prev = frozenset(projected_edges_prev)
+            if dfs_labels_prev not in self._DFSlabels_dict:
+                print("early termination failure detected")
+                self._add_dfslabel_to_early_termination_failure_dictionary(dfs_labels_prev, set_of_proj_edges_prev)
+                return True
+            else:
+                set_of_sets_prev = self._DFSlabels_dict[dfs_labels_prev]
+                if set_of_proj_edges_prev in set_of_sets_prev:
+                    return False
+                else:
+                    print("early termination failure detected")
+                    self._add_dfslabel_to_early_termination_failure_dictionary(dfs_labels_prev, set_of_proj_edges_prev)
+                    return True
+        return False
+
     def _subgraph_mining(self, projected):
+        terminate_early = False
         self._support = self._get_support(projected)
         if self._support < self._min_support:
             return
         if not self._is_min():
             return
-        if self._terminate_early(projected):
-            return
+        terminate_early =  self._terminate_early(projected)
+        if terminate_early:
+            terminate_early_failure_prev = self._early_termination_failure_prev(projected)
+            if terminate_early_failure_prev:
+                return
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()
@@ -629,7 +764,10 @@ class closeGraph(object):
                 (VACANT_VERTEX_LABEL, elb, VACANT_VERTEX_LABEL))
             )
             following_projection = backward_root[(to,elb)]
-
+            if terminate_early:
+                self._early_termination_failure_next(following_projection)
+                self._DFScode.pop()
+                continue
             self._subgraph_mining(following_projection)
             if self._should_output(projected,following_projection) is False:
                 output = False
@@ -645,14 +783,23 @@ class closeGraph(object):
                 (VACANT_VERTEX_LABEL, elb, vlb2))
             )
             following_projection = forward_root[(frm,elb,vlb2)]
-
+            if terminate_early:
+                self._early_termination_failure_next(following_projection)
+                self._DFScode.pop()
+                continue
             self._subgraph_mining(following_projection)
             if self._should_output(projected,following_projection) is False:
                 output = False
 
             self._DFScode.pop()
 
+        if terminate_early:
+            return
         if output:
+            if self._mode == CloseGraphMode.EarlyTerminationFailure:
+                is_early_termination_failure_case = self._is_early_termination_failure_case(projected)
+                if not is_early_termination_failure_case:
+                    return
             self._add_subgraph_dfslabels_to_dictionary(projected) #before reporting update the dictionary
             self._report(projected)
         return self
@@ -679,38 +826,86 @@ class closeGraph(object):
             else:
                 return False
 
+    def _is_early_termination_failure_case(self, projected):
+        if projected is None:
+            return False
+
+        pdfs = list()
+
+        for pdf in projected:
+            if pdf is None:
+                return False
+            pdfs.append(pdf)
+
+        while True:
+
+            projected_edges, g, edge = self._collect_projected_edges(pdfs)
+            frmlbl, edgelbl, tolbl = self._get_DFSLabels(g, edge)
+            frmlbl_norm, tolbl_norm = self._normalize_DFSLabels(frmlbl, tolbl)
+            dfs_labels = DFSlabels(frmlbl=frmlbl_norm, edgelbl=edgelbl, tolbl=tolbl_norm)
+
+            # Check if set of projected edges already exists in the values of the specified key
+            # return true if yes, false otherwise
+            set_of_proj_edges = frozenset(projected_edges)
+            if dfs_labels not in self._DFSlabels_early_termination_failure_dict:
+                pdfs_temp = list()
+                for pdf in pdfs:
+                    if pdf.prev is None:
+                        return False
+                    pdfs_temp.append(pdf.prev)
+                pdfs = pdfs_temp
+                continue
+            else:
+                set_of_sets = self._DFSlabels_early_termination_failure_dict[dfs_labels]
+                if set_of_proj_edges in set_of_sets:
+                    return True  # Early Termination case
+                else:
+                    pdfs_temp = list()
+                    for pdf in pdfs:
+                        if pdf.prev is None:
+                            return False
+                        pdfs_temp.append(pdf.prev)
+                    pdfs = pdfs_temp
+                    continue
+
     def _add_subgraph_dfslabels_to_dictionary(self, projected):
         """
         Recursively adds the edges in the provided subgraph to the DFSLabels dictionary
         """
+
         if projected is None:
             return
 
+        pdfs = list()
         for pdf in projected:
             if pdf is None:
                 return
+            pdfs.append(pdf)
 
-        projected_edges, g, edge = self._collect_projected_edges(projected)
-        frmlbl, edgelbl, tolbl = self._get_DFSLabels(g, edge)
-        frmlbl_norm, tolbl_norm = self._normalize_DFSLabels(frmlbl, tolbl)
-        dfs_labels = DFSlabels(frmlbl=frmlbl_norm, edgelbl=edgelbl, tolbl=tolbl_norm)
+        while True:
+            projected_edges, g, edge = self._collect_projected_edges(pdfs)
+            frmlbl, edgelbl, tolbl = self._get_DFSLabels(g, edge)
+            frmlbl_norm, tolbl_norm = self._normalize_DFSLabels(frmlbl, tolbl)
+            dfs_labels = DFSlabels(frmlbl=frmlbl_norm, edgelbl=edgelbl, tolbl=tolbl_norm)
 
-        # Update DFSlabels dictionary to reference new projected edge
-        set_of_proj_edges = frozenset(projected_edges)
-        if dfs_labels not in self._DFSlabels_dict:
-            set_of_sets = set()
-            set_of_sets.add(set_of_proj_edges)
-            # Structure of DFSlabels_dict is DFSlabels -> set(frozenset(ProjectedEdges))
-            self._DFSlabels_dict[dfs_labels] = set_of_sets
-        else:
-            set_of_sets = self._DFSlabels_dict[dfs_labels]
-            if set_of_proj_edges not in set_of_sets:
-                set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
+            # Update DFSlabels dictionary to reference new projected edge
+            set_of_proj_edges = frozenset(projected_edges)
+            if dfs_labels not in self._DFSlabels_dict:
+                set_of_sets = set()
+                set_of_sets.add(set_of_proj_edges)
+                # Structure of DFSlabels_dict is DFSlabels -> set(frozenset(ProjectedEdges))
+                self._DFSlabels_dict[dfs_labels] = set_of_sets
+            else:
+                set_of_sets = self._DFSlabels_dict[dfs_labels]
+                if set_of_proj_edges not in set_of_sets:
+                    set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
 
-        #Recursively add the edges in the subgraph to the dictionary
-        projected_copy = copy.deepcopy(projected)
-        headless_projected = self._remove_head_from_projected_pdfs(projected_copy)
-        self._add_subgraph_dfslabels_to_dictionary(headless_projected)
+            pdfs_temp = list()
+            for pdf in pdfs:
+                if pdf.prev is None:
+                    return
+                pdfs_temp.append(pdf.prev)
+            pdfs = pdfs_temp
 
     def _remove_head_from_projected_pdfs(self, projected):
         for pdf_index in range(len(projected)):
@@ -730,7 +925,8 @@ class closeGraph(object):
         for pdfs in projected:
             g = self.graphs[pdfs.gid]
             edge = pdfs.edge
-            new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
+            #new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
+            new_proj_edge = self.graphs[pdfs.gid].projected_edges[edge.eid]
             projected_edges.append(new_proj_edge)
         return projected_edges,g,edge
 

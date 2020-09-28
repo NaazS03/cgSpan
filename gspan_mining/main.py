@@ -9,7 +9,7 @@ import sys
 
 from config import parser
 from gspan import gSpan
-from closegraph import closeGraph
+from closegraph import closeGraph, CloseGraphMode
 
 
 def main(FLAGS=None):
@@ -52,7 +52,25 @@ def main(FLAGS=None):
 
     cg.run()
     cg.time_stats()
-    return cg
+
+    cg_early_termination = closeGraph(
+        database_file_name=FLAGS.database_file_name,
+        min_support=FLAGS.min_support,
+        min_num_vertices=FLAGS.lower_bound_of_num_vertices,
+        max_num_vertices=FLAGS.upper_bound_of_num_vertices,
+        max_ngraphs=FLAGS.num_graphs,
+        is_undirected=(not FLAGS.directed),
+        verbose=FLAGS.verbose,
+        visualize=FLAGS.plot,
+        where=FLAGS.where,
+        mode=CloseGraphMode.EarlyTerminationFailure
+    )
+
+    cg_early_termination._cg = cg
+    cg_early_termination.run_early_termination_failure()
+    cg_early_termination.time_stats_early_termination_failure()
+
+    return cg, cg_early_termination
 
 
 if __name__ == '__main__':
