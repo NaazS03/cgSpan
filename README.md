@@ -7,7 +7,7 @@ is built using an existing implementation for gSpan.
 
 This program implements CloseGraph with Python. The repository on GitHub is [https://github.com/NaazS03/CloseGraph](https://github.com/NaazS03/CloseGraph)
 
-The gSpan implementation referenced by this program can be found on GitHub at [https://github.com/betterenvi/gSpan](https://github.com/betterenvi/gSpan). This implementation borrows some ideas from [gboost](http://www.nowozin.net/sebastian/gboost/).
+The gSpan implementation referenced by this program can be found on GitHub at [https://github.com/betterenvi/gSpan](https://github.com/betterenvi/gSpan).
 
 ### Undirected Graphs
 This program supports undirected graphs.
@@ -46,17 +46,17 @@ python -m gspan_mining -s 5000 ./graphdata/graph.data
 python -m gspan_mining -s 5000 -p True ./graphdata/graph.data
 ```
 
-- Read graph data from ./graphdata/graph.data, and mine directed subgraphs given min support is 5000
-```
-python -m gspan_mining -s 5000 -d True ./graphdata/graph.data
-```
-
 - Print help info
 ```
 python -m gspan_mining -h
 ```
 
 ### Reference
-- [Paper](https://sites.cs.ucsb.edu/~xyan/papers/CloseGraph.pdf)
+- [CloseGraph Paper](https://sites.cs.ucsb.edu/~xyan/papers/CloseGraph.pdf)
 
 CloseGraph: Mining Close Frequent Graph Patterns, by X. Yan and J.Han.
+
+- [gSpan Paper](http://www.cs.ucsb.edu/~xyan/papers/gSpan-short.pdf)
+
+gSpan: Graph-Based Substructure Pattern Mining, by X. Yan and J. Han. 
+Proc. 2002 of Int. Conf. on Data Mining (ICDM'02). 
