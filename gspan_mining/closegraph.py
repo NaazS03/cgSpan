@@ -15,7 +15,7 @@ from graph import VACANT_GRAPH_ID
 from graph import VACANT_VERTEX_LABEL
 
 import pandas as pd
-
+from memory_profiler import profile
 
 def record_timestamp(func):
     """Record timestamp before and after call of `func`."""
@@ -281,12 +281,24 @@ class closeGraph(object):
                 2
             )
 
+        # print('Read:\t{} s'.format(time_deltas['_read_graphs']))
+        # print('Mine:\t{} s'.format(
+        #     time_deltas['run'] - time_deltas['_read_graphs']))
+        # print('Total:\t{} s'.format(time_deltas['run']))
+
+        print('****************************')
+        print('Time Statistics')
         print('Read:\t{} s'.format(time_deltas['_read_graphs']))
-        print('Mine:\t{} s'.format(
-            time_deltas['run'] - time_deltas['_read_graphs']))
+        print('CloseGraph:\t{} s'.format(round(time_deltas['run'] - time_deltas['_read_graphs'],2)))
         print('Total:\t{} s'.format(time_deltas['run']))
+        print('****************************')
 
         return self
+
+    def graph_dataset_stats(self):
+        """Print the number of graphs and closed graphs in the provided dataset"""
+        num_closed_graphs = len(self._frequent_subgraphs)
+        print("The total number of closed graphs found were: {}".format(num_closed_graphs))
 
     @record_timestamp
     def _read_graphs(self):
@@ -348,6 +360,7 @@ class closeGraph(object):
             self._counter = itertools.count()
 
     @record_timestamp
+    # @profile #Uncomment if memory profiler is desired
     def run(self):
         """Run the closeGraph algorithm."""
         self._read_graphs()
@@ -653,7 +666,8 @@ class closeGraph(object):
             self._DFScode.pop()
 
         if output:
-            self._add_subgraph_dfslabels_to_dictionary(projected) #before reporting update the dictionary
+            # self._add_subgraph_dfslabels_to_dictionary(projected) #before reporting update the dictionary
+            self._add_subgraph_dfslabels_to_dictionary(copy.deepcopy(projected)) #before reporting update the dictionary
             self._report(projected)
         return self
 
@@ -679,18 +693,18 @@ class closeGraph(object):
             else:
                 return False
 
-    def _add_subgraph_dfslabels_to_dictionary(self, projected):
+    def _add_subgraph_dfslabels_to_dictionary(self, projected_deep_copy):
         """
         Recursively adds the edges in the provided subgraph to the DFSLabels dictionary
         """
-        if projected is None:
+        if projected_deep_copy is None:
             return
 
-        for pdf in projected:
+        for pdf in projected_deep_copy:
             if pdf is None:
                 return
 
-        projected_edges, g, edge = self._collect_projected_edges(projected)
+        projected_edges, g, edge = self._collect_projected_edges(projected_deep_copy)
         frmlbl, edgelbl, tolbl = self._get_DFSLabels(g, edge)
         frmlbl_norm, tolbl_norm = self._normalize_DFSLabels(frmlbl, tolbl)
         dfs_labels = DFSlabels(frmlbl=frmlbl_norm, edgelbl=edgelbl, tolbl=tolbl_norm)
@@ -708,8 +722,7 @@ class closeGraph(object):
                 set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
 
         #Recursively add the edges in the subgraph to the dictionary
-        projected_copy = copy.deepcopy(projected)
-        headless_projected = self._remove_head_from_projected_pdfs(projected_copy)
+        headless_projected = self._remove_head_from_projected_pdfs(projected_deep_copy)
         self._add_subgraph_dfslabels_to_dictionary(headless_projected)
 
     def _remove_head_from_projected_pdfs(self, projected):

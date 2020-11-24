@@ -2,6 +2,25 @@ import unittest
 from closegraph import closeGraph
 
 class CloseGraphTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(self) -> None:
+        self.f = open("unittestCloseGraphOutput.txt", "w")
+
+    @classmethod
+    def tearDownClass(self) -> None:
+        self.f.close()
+
+    def updateOutput(self,results):
+        self.f.write(str(sorted(results)) + "\n")
+
+    def convert_results_format(self,results):
+        results_as_tuples = []
+        for result in results:
+            support,description,num_vertices = result[0],result[1],result[2]
+            results_as_tuples.append((support,description,num_vertices))
+
+        return results_as_tuples
+
     def test_case_00(self):
         cg = closeGraph(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.0",
@@ -16,6 +35,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_1 = ('2','v 0 A v 1 B v 2 C v 3 D e 0 1 x e 1 2 y e 1 3 z ','4')
         solutions = [solution_1]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_01(self):
@@ -31,6 +51,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_1 = ('2','v 0 A v 1 B v 2 C v 3 D e 0 1 x e 1 2 y e 2 3 z ','4')
         solutions = [solution_1]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_02(self):
@@ -46,6 +67,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_1 = ('2','v 0 A v 1 B v 2 C e 0 1 x e 0 2 z e 1 2 y ','3')
         solutions = [solution_1]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_03(self):
@@ -61,6 +83,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_1 = ('2','v 0 A v 1 B v 2 C v 3 D v 4 E e 0 1 w e 0 2 x e 0 3 y e 0 4 z ','5')
         solutions = [solution_1]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_04(self):
@@ -76,6 +99,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_1 = ('2','v 0 A v 1 D v 2 C v 3 B e 0 1 x e 0 2 y e 0 3 z e 1 2 v e 2 3 w ','4')
         solutions = [solution_1]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_05(self):
@@ -91,7 +115,12 @@ class CloseGraphTests(unittest.TestCase):
         solution_1 = ('2','v 0 A v 1 D v 2 E v 3 B v 4 C e 0 1 y e 0 3 z e 1 2 w e 3 4 x ','5')
         solutions = [solution_1]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
+
+    def test_testcase_06(self):
+        #Placeholder test for repeat of testcase 1 with a third graph added
+        self.assertEqual(True,True)
 
     def test_case_07(self):
         cg = closeGraph(
@@ -107,6 +136,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_2 = ('3','v 0 A v 1 B v 2 C e 0 1 x e 1 2 y ','3')
         solutions = [solution_1, solution_2]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_08(self):
@@ -123,6 +153,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_2 = ('3','v 0 A v 1 B v 2 C v 3 D e 0 1 w e 0 2 x e 0 3 y ','4')
         solutions = [solution_1, solution_2]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results),"Atleast one solution was not found.")
 
     def test_case_09(self):
@@ -139,6 +170,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_2 = ('3','v 0 A v 1 D v 2 C v 3 B e 0 1 x e 0 2 y e 0 3 z e 2 3 w ','4')
         solutions = [solution_1, solution_2]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions),sorted(results),"Atleast one solution was not found.")
 
     def test_case_10(self):
@@ -155,6 +187,7 @@ class CloseGraphTests(unittest.TestCase):
         solution_2 = ('3', 'v 0 A v 1 D v 2 B v 3 C e 0 1 y e 0 2 z e 2 3 x ', '4')
         solutions = [solution_1, solution_2]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_11(self):
@@ -171,16 +204,8 @@ class CloseGraphTests(unittest.TestCase):
         solution_2 = ('3','v 0 A v 1 AA v 2 B v 3 E e 0 1 m e 1 2 n e 1 3 q ','4')
         solutions = [solution_1, solution_2]
 
+        self.updateOutput(results)
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
-
-    def convert_results_format(self,results):
-        results_as_tuples = []
-        for result in results:
-            support,description,num_vertices = result[0],result[1],result[2]
-            results_as_tuples.append((support,description,num_vertices))
-
-        return results_as_tuples
-
 
 if __name__ == '__main__':
     unittest.main()
