@@ -105,7 +105,7 @@ class Graph(object):
         if self.is_undirected:
             self.vertices[to].add_edge(eid, to, frm, elb)
             self.set_of_elb[elb].add((to, frm))
-        return self
+        return eid
 
     def display(self):
         """Display the graph as text."""
@@ -152,3 +152,179 @@ class Graph(object):
         nx.draw_networkx(gnx, pos, arrows=True, with_labels=True, labels=vlbs)
         nx.draw_networkx_edge_labels(gnx, pos, edge_labels=elbs)
         plt.show()
+
+    def _get_DFSLabels(self, edge):
+        frmlbl = self.vertices[edge.frm].vlb
+        edgelbl = edge.elb
+        tolbl = self.vertices[edge.to].vlb
+        return frmlbl, edgelbl, tolbl
+
+class EnumeratedEdge(object):
+    def __init__(self, originalGraphId, edgeId):
+        """Initialize ProjectedEdge instance."""
+        self.originalGraphId = originalGraphId
+        self.edgeId = edgeId
+
+    def __repr__(self):
+        """Represent ProjectedEdge in string way."""
+        return '(originalGraphId={}, edgeId={})'.format(
+            self.originalGraphId, self.edgeId
+        )
+
+    def __eq__(self, other):
+        """Check equivalence of ProjectedEdge."""
+        return (self.originalGraphId == other.originalGraphId and
+                self.edgeId == other.edgeId)
+
+    def __ne__(self, other):
+        """Check if not equal."""
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(hash(self.originalGraphId) + hash(self.edgeId))
+
+# Start Close Graph specific classes
+class DFSlabel(object):
+    def __init__(self, frmlbl, edgelbl, tolbl):
+        """Initialize DFSlabel instance."""
+        self.frmlbl = min(frmlbl, tolbl)
+        self.edgelbl = edgelbl
+        self.tolbl = max(frmlbl, tolbl)
+
+    def __repr__(self):
+        """Represent DFSlabel in string way."""
+        return '(frmlbl={}, edgelbl={}, tolbl={})'.format(
+            self.frmlbl, self.edgelbl, self.tolbl
+        )
+
+    def __eq__(self, other):
+        """Check equivalence of DFSlabels."""
+        return ((self.frmlbl == other.frmlbl and self.edgelbl == other.edgelbl and self.tolbl == other.tolbl) or
+               (self.frmlbl == other.tolbl and self.edgelbl == other.edgelbl and self.tolbl == other.frmlbl))
+
+    def __ne__(self, other):
+        """Check if not equal."""
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(hash(self.frmlbl) + hash(self.edgelbl) + hash(self.tolbl))
+
+
+class DatabaseGraph(Graph):
+    def __init__(self,
+                 gid=VACANT_GRAPH_ID,
+                 is_undirected=True,
+                 eid_auto_increment=True):
+        super().__init__(gid, is_undirected, eid_auto_increment)
+        self.enumerated_edges = dict()
+
+    def add_edge(self, eid, frm, to, elb):
+        eid = super(DatabaseGraph, self).add_edge(eid, frm, to , elb)
+        self.enumerated_edges[eid] = EnumeratedEdge(self.gid, eid)
+
+class FrequentGraph(Graph):
+    def __init__(self,
+                 edges_projection_sets,
+                 where_graphs,
+                 where_projections,
+                 pdfs_edges_projection_set,
+                 pdfs_edges_projection_list,
+                 example_gid,
+                 gid=VACANT_GRAPH_ID,
+                 is_undirected=True,
+                 eid_auto_increment=True):
+        super().__init__(gid, is_undirected, eid_auto_increment)
+        self.edges_projection_sets = edges_projection_sets
+        self.where_graphs = where_graphs
+        self.support_graphs = len(where_graphs)
+        self.where_projections = sorted(where_projections)
+        self.support_projections = len(where_projections)
+        self.pdfs_edges_projection_set = pdfs_edges_projection_set
+        self.pdfs_edges_projection_list = pdfs_edges_projection_list
+        self.example_gid = example_gid
+
+    def is_supergraph_of_with_support_graphs(self, g):
+        if self.support_graphs != g.support_graphs:
+            return False
+
+        if set(self.where_graphs) != set(g.where_graphs):
+            return False
+
+        if not self.edges_projection_sets.keys().issuperset(g.edges_projection_sets.keys()):
+            return False
+
+        if self.get_num_vertices() < g.get_num_vertices():
+            return False
+
+        for my_pdfs in self.example_pdfs_edges_projection_set:
+            for other_pdfs in g.example_pdfs_edges_projection_set:
+                if my_pdfs.issuperset(other_pdfs):
+                    return True
+            # we need to check only on one example
+            return False
+
+    def is_supergraph_of_with_support_projections(self, g):
+        return self.check_equivalent_occurrence(g.support_projections, g.where_projections, g.pdfs_edges_projection_list)
+
+    def check_equivalent_occurrence(self, support_projections, where_projections, pdfs_edges_projection_list):
+        if self.support_projections < support_projections:
+            return False
+
+        if set(self.where_projections) != set(where_projections):
+            return False
+
+        #if not edges_projection_sets is None:
+        #    if not self.edges_projection_sets.keys().issuperset(edges_projection_sets.keys()):
+        #        return False
+
+        #if self.get_num_vertices() < num_vertices:
+        #    return False
+
+        possible_isomorphisms = self.find_possible_isomorphisms(pdfs_edges_projection_list[self.example_gid])
+        isomorphism_found = False
+        for isomorphism in possible_isomorphisms:
+            for gid in pdfs_edges_projection_list.keys():
+                for other_edges_projections_list in pdfs_edges_projection_list[gid]:
+                    isomorphism_found = True
+                    for my_edges_projections_list in self.pdfs_edges_projection_list[gid]:
+                        isomorphism_found = True
+                        for other_index in isomorphism.keys():
+                            my_index = isomorphism[other_index]
+                            if other_edges_projections_list[other_index] != my_edges_projections_list[my_index]:
+                                isomorphism_found = False
+                                break
+                        if isomorphism_found is True:
+                            break
+                    if isomorphism_found is False:
+                        break
+                if isomorphism_found is False:
+                    break
+            if isomorphism_found is True:
+                break
+
+        return isomorphism_found
+
+    def find_possible_isomorphisms(self, edges_projection_list):
+        possible_isomorphisms = list()
+        other_projected_edges = edges_projection_list[0];
+        for my_projected_edges in self.pdfs_edges_projection_list[self.example_gid]:
+            isomorphism = dict()
+            for i, other_edge in enumerate(other_projected_edges):
+                for j, my_edge in enumerate(my_projected_edges):
+                    if other_edge == my_edge:
+                        isomorphism[i] = j;
+                        break;
+            if len(isomorphism) == len(other_projected_edges):
+                possible_isomorphisms.append(isomorphism)
+        return possible_isomorphisms
+
+
+    def has_edge_projection_set(self, dfs_labels, set_of_proj_edges):
+        if dfs_labels not in self.edges_projection_sets:
+            return False
+        else:
+            set_of_sets = self.edges_projection_sets[dfs_labels]
+            if set_of_proj_edges in set_of_sets:
+                return True
+            else:
+                return False
