@@ -17,6 +17,7 @@ from graph import VACANT_VERTEX_LABEL
 from graph import DatabaseGraph
 from graph import FrequentGraph
 from graph import DFSlabel
+from graph import EdgeDirection
 
 import pandas as pd
 
@@ -112,6 +113,7 @@ class DFScode(list):
             if vlb2 != VACANT_VERTEX_LABEL:
                 g.add_vertex(to, vlb2)
             g.add_edge(AUTO_EDGE_ID, frm, to, elb)
+        g.dfs_code_edges_directions = self.edges_directions()
         return g
 
     def to_frequent_graph(self, graph_edges_projection_sets, where_graphs, where_projections,
@@ -133,7 +135,18 @@ class DFScode(list):
             if vlb2 != VACANT_VERTEX_LABEL:
                 g.add_vertex(to, vlb2)
             g.add_edge(AUTO_EDGE_ID, frm, to, elb)
+        g.dfs_code_edges_directions = self.edges_directions()
         return g
+
+    def edges_directions(self):
+        directions = list()
+        for dfsedge in reversed(self):
+            frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
+            if frm < to:
+                directions.append(EdgeDirection.Forward)
+            else:
+                directions.append(EdgeDirection.Backward)
+        return directions
 
     def from_graph(self, g):
         """Build DFScode from graph `g`."""
@@ -267,6 +280,7 @@ class closeGraph(object):
         # Include subgraphs with
         # any num(but >= 2, <= max_num_vertices) of vertices.
         self._frequent_subgraphs = list()
+        self._early_termination_failure_causing_graphs = dict()
         self._counter = itertools.count()
         self._verbose = verbose
         self._visualize = visualize
@@ -283,6 +297,8 @@ class closeGraph(object):
         self.edge_projection_sets = dict()
         self.edge_projection_sets_closed_graphs = dict()
         self._report_df_cumulative = pd.DataFrame()
+        self.i = 0
+        self._current_frequent_gid = 0
 
     def time_stats(self):
         """Print stats of time."""
@@ -519,6 +535,97 @@ class closeGraph(object):
                     to_vlb <= new_to_vlb):
                 result.append(e)
         return result
+
+    def _can_create_early_termination_failure(self, projected, path):
+        forward_root = collections.defaultdict(set)
+        backward_root = collections.defaultdict(set)
+        for i, p in enumerate(projected):
+            g = self.graphs[p.gid]
+            history = History(g, p)
+            checked_vertices = set()
+
+            for path_i in path:
+                path_forward_edges = []
+                path_backward_edges = []
+
+                if self._DFScode[path_i].frm in checked_vertices:
+                    continue
+                checked_vertices.add(self._DFScode[path_i].frm)
+                for to, e in g.vertices[history.edges[path_i].frm].edges.items():
+
+                    if history.has_edge(e.eid):
+                        continue
+                    if e.frm != history.edges[path_i].frm:
+                        continue
+                    if history.has_vertex(e.to):
+                        path_backward_edges.append(e)
+                    else:
+                        path_forward_edges.append(e)
+
+                for e in path_forward_edges:
+                    forward_root[
+                        (self._DFScode[path_i].frm,
+                         e.elb, g.vertices[e.to].vlb)
+                    ].add(p.gid)
+
+                for e in path_backward_edges:
+                    backward_root[
+                        (self._DFScode[path_i].frm,
+                         e.elb, g.vertices[e.to].vlb)
+                    ].add(p.gid)
+
+
+            for path_i in path:
+                path_forward_edges = []
+                path_backward_edges = []
+
+                if self._DFScode[path_i].to in checked_vertices:
+                    continue
+                checked_vertices.add(self._DFScode[path_i].to)
+
+                for to, e in g.vertices[history.edges[path_i].to].edges.items():
+
+                    if history.has_edge(e.eid):
+                        continue
+                    if e.frm != history.edges[path_i].to:
+                        continue
+                    if history.has_vertex(e.to):
+                        path_backward_edges.append(e)
+                    else:
+                        path_forward_edges.append(e)
+
+                for e in path_forward_edges:
+                    forward_root[
+                        (self._DFScode[path_i].to,
+                         e.elb, g.vertices[e.to].vlb)
+                    ].add(p.gid)
+
+                for e in path_backward_edges:
+                    backward_root[
+                        (self._DFScode[path_i].to,
+                         e.elb, g.vertices[e.to].vlb)
+                    ].add(p.gid)
+        
+        for v, elb, vlb in backward_root:
+            if (v, elb, vlb) in forward_root:
+                if len(forward_root[(v, elb, vlb)]) >= self._min_support:
+                    continue
+                gids = backward_root[(v, elb, vlb)].union(forward_root[(v, elb, vlb)])
+                if len(gids) >= self._min_support:
+                    return True
+            else:
+                if len(backward_root[(v, elb, vlb)]) >= self._min_support:
+                    return True
+        return False
+
+    def _is_early_termination_failure_causing_graph_subgraph(self, g, current_frequent_gid):
+        for gid in self._early_termination_failure_causing_graphs.keys():
+            if gid > current_frequent_gid:
+                continue
+            has_equivalent_occurrence, preserves_directions = self._early_termination_failure_causing_graphs[gid].is_supergraph_of_with_support_projections(g)
+            if has_equivalent_occurrence:
+                return True
+        return False
 
     def _has_equivalent_extended_occurrence_projections(self, projected, rmpath, num_vertices, maxtoc):
         backward_root = collections.defaultdict(set)
@@ -780,6 +887,8 @@ class closeGraph(object):
         return res
 
     def _subgraph_mining(self, projected):
+        self.i = self.i + 1
+        current_frequent_gid = self._current_frequent_gid
         # self._support = self._get_support_projections(projected) if self._support_mode == SupportMode.Projections else self._get_support_graphs(projected)
         self._support = self._get_support_graphs(projected)
         if self._support < self._min_support:
@@ -898,17 +1007,22 @@ class closeGraph(object):
             where_graphs = self._get_where_graphs(projected)
             where_projections = self._get_where_projections(projected)
             projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(projected)
+            self._current_frequent_gid = next(self._counter)
             g = self._DFScode.to_frequent_graph(graph_edges_projection_set,
                                                 where_graphs,
                                                 where_projections,
                                                 projected_edges_sets,
                                                 projected_edges_lists,
                                                 max_gid,
-                                                gid=next(self._counter),
+                                                gid=self._current_frequent_gid,
                                                 is_undirected=self._is_undirected)
             # g._dfscode = copy.copy(self._DFScode) # delete later
-            self._add_closed_graph_to_projection_set(g)  # before reporting update the dictionary
-            self._report(g)
+            if not self._is_early_termination_failure_causing_graph_subgraph(g, current_frequent_gid):
+                self._add_closed_graph_to_projection_set(g)  # before reporting update the dictionary
+                self._report(g)
+                etf = self._can_create_early_termination_failure(projected, list(range(0, len(self._DFScode))))
+                if etf:
+                    self._early_termination_failure_causing_graphs[g.gid] = g
         return self
 
     def _terminate_early_termination_failure(self, projected):
@@ -958,13 +1072,28 @@ class closeGraph(object):
                     support_projections = len(where_projections)
                     projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(
                         projected)
+                    can_be_descendant_of = False
+                    for gid in self._early_termination_failure_causing_graphs:
+                        can_be_descendant_of = self._early_termination_failure_causing_graphs[gid].can_be_descendant_of(support_projections, where_projections, projected_edges_lists)
+                        if can_be_descendant_of:
+                            break
                     for g in self.edge_projection_sets_closed_graphs[set_of_proj_edges]:
-                        has_equivalent_occurrence = g.check_equivalent_occurrence(support_projections, where_projections, projected_edges_lists)
+                        if g.gid in self._early_termination_failure_causing_graphs:
+                            continue
+                        edges_directions = self._DFScode.edges_directions()
+                        has_equivalent_occurrence, preserves_directions = g.check_equivalent_occurrence(support_projections, where_projections, projected_edges_lists, edges_directions)
                         if not has_equivalent_occurrence:
                             print("equivalent occurrence not verified gid ",g.gid)
                         else:
-                            print("equivalent occurrence verified")
-                            return True
+                            if can_be_descendant_of:
+                                self._early_termination_failure_causing_graphs[g.gid] = g
+                                print("equivalent occurrence can be ancestor of gid ", g.gid)
+                            else:
+                                if preserves_directions:
+                                    print("equivalent occurrence verified gid ", g.gid)
+                                    return True
+                                self._early_termination_failure_causing_graphs[g.gid] = g
+                                print("number closed graphs ", len(self._frequent_subgraphs), "number early terminating graphs ", len(self._early_termination_failure_causing_graphs))
                     return False  # Early Termination case
             else:
                 return False
@@ -1080,7 +1209,7 @@ class closeGraph(object):
             for g_tag in self._frequent_subgraphs:
                 if g.gid == g_tag.gid:
                     continue;
-                is_supergraph = g_tag.is_supergraph_of_with_support_projections(
+                is_supergraph, preserves_directions = g_tag.is_supergraph_of_with_support_projections(
                     g) if self._support_mode == SupportMode.Projections else g_tag.is_supergraph_of_with_support_graphs(
                     g)
                 if is_supergraph:

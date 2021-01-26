@@ -56,7 +56,7 @@ def main(FLAGS=None):
     closed_graphs = list()
     for g in cg._frequent_subgraphs:
         closed_graphs.append(g)
-    closed_graphs.sort(key=lambda x: x.support_projections)
+    closed_graphs.sort(key=lambda x: (x.support_projections, x.get_num_vertices()))
     for g in closed_graphs:
         g.display()
         print("projections ", g.support_projections, " vertices ", g.get_num_vertices())
