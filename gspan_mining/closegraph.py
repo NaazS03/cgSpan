@@ -18,6 +18,7 @@ from graph import DatabaseGraph
 from graph import FrequentGraph
 from graph import DFSlabel
 from graph import EdgeDirection
+from early_termination_failure import EarlyTerminationFailureTree
 
 import pandas as pd
 
@@ -72,9 +73,14 @@ class DFSedge(object):
 class DFScode(list):
     """DFScode is a list of DFSedge."""
 
-    def __init__(self):
+    def __init__(self, orig=None, last_index=None):
         """Initialize DFScode."""
-        self.rmpath = list()
+        if orig is None:
+            self.rmpath = list()
+        else:
+            for i in range(0, last_index):
+                self.append(orig[i])
+            self.rmpath = list()
 
     def __eq__(self, other):
         """Check equivalence of DFScode."""
@@ -117,13 +123,14 @@ class DFScode(list):
         return g
 
     def to_frequent_graph(self, graph_edges_projection_sets, where_graphs, where_projections,
-                          projected_edges_sets, projected_edges_lists,  example_gid, gid=VACANT_GRAPH_ID, is_undirected=True):
+                          projected_edges_sets, projected_edges_lists,  DFScode, example_gid, gid=VACANT_GRAPH_ID, is_undirected=True):
         """Construct a graph according to the dfs code."""
         g = FrequentGraph(graph_edges_projection_sets,
                           where_graphs,
                           where_projections,
                           projected_edges_sets,
                           projected_edges_lists,
+                          DFScode.copy(),
                           example_gid,
                           gid,
                           is_undirected=is_undirected,
@@ -164,6 +171,30 @@ class DFScode(list):
                 old_frm = frm
         return self
 
+    def build_all_dfs_codes(self):
+        """Build right most path."""
+        dfs_codes = list()
+        dfs_codes.append(self)
+        old_frm = None
+        for i in range(len(self) - 1, -1, -1):
+            dfsedge = self[i]
+            frm, to = dfsedge.frm, dfsedge.to
+            if frm < to and (old_frm is None or to == old_frm):
+                old_frm = frm
+                continue
+            else:
+                if frm > to and (old_frm is None or frm == old_frm):
+                    continue
+                else:
+                    old_frm = frm
+                    dfs_code = DFScode(self, i + 1)
+                    dfs_codes.append(dfs_code)
+
+        for dfs_code in dfs_codes:
+            dfs_code.build_rmpath()
+
+        return dfs_codes
+
     def get_num_vertices(self):
         """Return number of vertices in the corresponding graph."""
         return len(set(
@@ -186,6 +217,15 @@ class DFScode(list):
         frm, to, (min_vlb1, min_elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
         dfsedge.vevlb = (vlb1, elb, vlb2)
         return
+
+    def vertex_labels(self):
+        vlbs = dict()
+        for e in self:
+            if e.vevlb[0] != VACANT_VERTEX_LABEL:
+                vlbs[e.frm] = e.vevlb[0]
+            if e.vevlb[2] != VACANT_VERTEX_LABEL:
+                vlbs[e.to] = e.vevlb[2]
+        return vlbs
 
 
 class PDFS(object):
@@ -297,8 +337,12 @@ class closeGraph(object):
         self.edge_projection_sets = dict()
         self.edge_projection_sets_closed_graphs = dict()
         self._report_df_cumulative = pd.DataFrame()
+        self._current_early_termination_failure_causing_graphs = set()
         self.i = 0
-        self._current_frequent_gid = 0
+        self._current_frequent_gid = -1
+
+        self._early_termination_failure_tree = EarlyTerminationFailureTree()
+        self.etfDFScodes = list()
 
     def time_stats(self):
         """Print stats of time."""
@@ -348,15 +392,42 @@ class closeGraph(object):
                                            is_undirected=self._is_undirected,
                                            eid_auto_increment=True)
                 elif cols[0] == 'v':
-                    # prefix each vertex label with '0'
-                    tgraph.add_vertex(cols[1], '0' + cols[2])
+                    tgraph.add_vertex(cols[1], cols[2])
                 elif cols[0] == 'e':
-                    # prefix each edge label with '0'
-                    tgraph.add_edge(AUTO_EDGE_ID, cols[1], cols[2], '0' + cols[3])
+                    tgraph.add_edge(AUTO_EDGE_ID, cols[1], cols[2], cols[3])
             # adapt to input files that do not end with 't # -1'
             if tgraph is not None:
                 self.graphs[graph_cnt] = tgraph
         return self
+
+    def _write_graphs(self):
+        t = ''
+        for index in range(len(self.graphs)):
+            tgraph = self.graphs[index]
+            display_str = 't # {}\n'.format(tgraph.gid)
+
+            min_vid = -1
+            for vid in tgraph.vertices.keys():
+                if min_vid == -1:
+                    min_vid = int(vid)
+                else:
+                    if int(vid) < min_vid:
+                        min_vid = int(vid)
+
+            for vid in tgraph.vertices:
+                display_str += 'v {} {}\n'.format(int(vid) - min_vid, tgraph.vertices[vid].vlb)
+            for frm in tgraph.vertices:
+                edges = tgraph.vertices[frm].edges
+                for to in edges:
+                    if tgraph.is_undirected:
+                        if frm < to:
+                            display_str += 'e {} {} {}\n'.format(
+                                int(frm) - min_vid, int(to) - min_vid, edges[to].elb)
+                    else:
+                        display_str += 'e {} {} {}\n'.format(int(frm) - min_vid, int(to) - min_vid, edges[to].elb)
+            t = t + display_str
+
+        return t
 
     @record_timestamp
     def _generate_1edge_frequent_subgraphs(self):
@@ -411,6 +482,7 @@ class closeGraph(object):
         vevlbs.sort()
         for vevlb in vevlbs:
             self._DFScode.append(DFSedge(0, 1, vevlb))
+            self._frequent_graph_gid_before_root = 0 if len(self._frequent_subgraphs) == 0 else self._frequent_subgraphs[-1].gid
             self._subgraph_mining(root[vevlb])
             self._DFScode.pop()
 
@@ -894,21 +966,28 @@ class closeGraph(object):
         if self._support < self._min_support:
             return
 
-        vlb1 = None
-        elb = None
-        if self._mode == CloseGraphMode.EarlyTerminationFailure:
-            vlb1, elb = self._DFScode.set_root_minimal_labels()
-
         if not self._is_min():
-            if self._mode == CloseGraphMode.EarlyTerminationFailure:
-                self._DFScode.restore_root_original_labels(vlb1, elb)
             return
 
-        if self._mode == CloseGraphMode.EarlyTerminationFailure:
-            self._DFScode.restore_root_original_labels(vlb1, elb)
-
-        if self._terminate_early(projected):
+        self._DFScode.build_rmpath()
+        new_early_termination, new_eraly_termination_failure = self._terminate_early3(projected)
+        if new_early_termination:
+            print(self.i, " yes new early termination")
             return
+        else:
+            print(self.i, " no new early termination")
+
+        this_added_early_termination_failure_causing_graphs = set()
+        early_termination, this_early_termination_failure_causing_graphs =  self._terminate_early(projected)
+        for gid in this_early_termination_failure_causing_graphs:
+            if gid not in self._current_early_termination_failure_causing_graphs:
+                self._current_early_termination_failure_causing_graphs.add(gid)
+                this_added_early_termination_failure_causing_graphs.add(gid)
+        if early_termination and len(self._current_early_termination_failure_causing_graphs) == 0:
+            print(self.i," early termination")
+            # # # return
+        else:
+            print(self.i," no early termination")
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()
@@ -946,6 +1025,7 @@ class closeGraph(object):
                 forward_root[
                     (maxtoc, e.elb, g.vertices[e.to].vlb)
                 ].append(PDFS(g.gid, e, p))
+
             # rmpath forward
             for rmpath_i in rmpath:
                 edges = self._get_forward_rmpath_edges(g,
@@ -958,9 +1038,12 @@ class closeGraph(object):
                         (self._DFScode[rmpath_i].frm,
                          e.elb, g.vertices[e.to].vlb)
                     ].append(PDFS(g.gid, e, p))
-        # Begin searching through forward and backward edges
 
-        # output = True
+        #self._terminate_early1(maxtoc, forward_root, backward_root)
+        last_closed_gid = self._current_frequent_gid
+        forward_etf_path, backward_etf_path = self._terminate_early2(maxtoc, forward_root, backward_root, projected, rmpath)
+
+        # Begin searching through forward and backward edges
 
         # backward
         for to, elb in backward_root:
@@ -992,6 +1075,21 @@ class closeGraph(object):
 
             self._DFScode.pop()
 
+        for closed_gid in range(last_closed_gid + 1, self._current_frequent_gid + 1):
+            if forward_etf_path is not None:
+                self._early_termination_failure_tree.add_path_close_graphs(forward_etf_path, closed_gid)
+            if backward_etf_path is not None:
+                self._early_termination_failure_tree.add_path_close_graphs(backward_etf_path, closed_gid)
+                #for i in range(1, len(backward_etf_path)):
+                #    self._early_termination_failure_tree.add_path_close_graphs(backward_etf_path[0:i], closed_gid)
+
+        # # #if len(this_early_termination_failure_causing_graphs) > 0:
+        # # #    self._current_early_termination_failure_causing_graphs = self._current_early_termination_failure_causing_graphs - this_added_early_termination_failure_causing_graphs
+        # # #    return
+
+        if new_eraly_termination_failure:
+            return
+
         has_equivalent_extended_occurrence = \
             self._has_equivalent_extended_occurrence_projections(projected, rmpath, num_vertices,
                                                                  maxtoc) if self._support_mode == SupportMode.Projections \
@@ -1001,29 +1099,40 @@ class closeGraph(object):
         # if output != (not has_equivalent_extended_occurrence):
         #    print("output and has_equivalent_extended_occurrence disagree")
 
-        if not has_equivalent_extended_occurrence:
-            # if output:
-            graph_edges_projection_set = self._projected_to_edges_projection_set(projected)
-            where_graphs = self._get_where_graphs(projected)
-            where_projections = self._get_where_projections(projected)
-            projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(projected)
-            self._current_frequent_gid = next(self._counter)
-            g = self._DFScode.to_frequent_graph(graph_edges_projection_set,
-                                                where_graphs,
-                                                where_projections,
-                                                projected_edges_sets,
-                                                projected_edges_lists,
-                                                max_gid,
-                                                gid=self._current_frequent_gid,
-                                                is_undirected=self._is_undirected)
-            # g._dfscode = copy.copy(self._DFScode) # delete later
-            if not self._is_early_termination_failure_causing_graph_subgraph(g, current_frequent_gid):
-                self._add_closed_graph_to_projection_set(g)  # before reporting update the dictionary
-                self._report(g)
-                etf = self._can_create_early_termination_failure(projected, list(range(0, len(self._DFScode))))
-                if etf:
-                    self._early_termination_failure_causing_graphs[g.gid] = g
-        return self
+        if has_equivalent_extended_occurrence:
+            return
+
+        graph_edges_projection_set = self._projected_to_edges_projection_set(projected)
+        where_graphs = self._get_where_graphs(projected)
+        where_projections = self._get_where_projections(projected)
+        projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(projected)
+        self._current_frequent_gid = next(self._counter)
+        g = self._DFScode.to_frequent_graph(graph_edges_projection_set,
+                                            where_graphs,
+                                            where_projections,
+                                            projected_edges_sets,
+                                            projected_edges_lists,
+                                            self._DFScode,
+                                            max_gid,
+                                            gid=self._current_frequent_gid,
+                                            is_undirected=self._is_undirected)
+
+        etf = self._can_create_early_termination_failure(projected, list(range(0, len(self._DFScode))))
+        if etf:
+            self._early_termination_failure_causing_graphs[g.gid] = g
+            print("graph ", str(g.gid), " can create etf")
+
+
+        if forward_etf_path is not None:
+            self._early_termination_failure_tree.add_path_close_graphs(forward_etf_path, self._current_frequent_gid)
+        if backward_etf_path is not None:
+            self._early_termination_failure_tree.add_path_close_graphs(backward_etf_path, self._current_frequent_gid)
+
+
+        self._add_closed_graph_to_projection_set(g)  # before reporting update the dictionary
+        self._report(g)
+
+        return
 
     def _terminate_early_termination_failure(self, projected):
         projected_edges, g, edge = self._collect_projected_edges(projected)
@@ -1046,10 +1155,476 @@ class closeGraph(object):
 
         return False
 
+    def _projected_tail(self, projected, index):
+        projected_tails = list()
+        for pdfs in projected:
+            for i in range(0,index):
+               pdfs = pdfs.prev
+            already_exist = False
+            for pdfs_tail in projected_tails:
+                i = pdfs
+                j = pdfs_tail
+                if i.gid != j.gid:
+                    break
+                if i.edge.eid != j.edge.eid:
+                    break
+                i = i.prev
+                j = j.prev
+                if i is None:
+                    already_exist = True
+                    break
+            if not already_exist:
+                projected_tails.append(pdfs)
+        return projected_tails
+
+    def _terminate_early2(self, maxtoc, forward_root, backward_root,projected, rmpath):
+        forward_root_etf = collections.defaultdict(set)
+        backward_root_etf = collections.defaultdict(set)
+        backward_root_etf_rmpath = collections.defaultdict(set)
+        backward_root_etf_rmpath_tail = collections.defaultdict(set)
+        backward_root_etf_rmpath_gaps = collections.defaultdict(set)
+
+        forward_etf_path = None
+        backward_etf_path = None
+
+        # type 1
+        if self._DFScode[-1].to > self._DFScode[-1].frm:
+            for p in projected:
+                g = self.graphs[p.gid]
+                history = History(g, p)
+
+                g_rmpath_vertices = set()
+                for rmpath_i in rmpath:
+                    g_rmpath_vertices.add(history.edges[rmpath_i].frm)
+                    g_rmpath_vertices.add(history.edges[rmpath_i].to)
+
+                for to, e in g.vertices[history.edges[rmpath[0]].to].edges.items():
+
+                    if history.has_edge(e.eid):
+                        continue
+
+                    if e.frm != history.edges[rmpath[0]].to:
+                        continue
+
+                    if e.to in g_rmpath_vertices:
+                        continue
+
+                    if history.has_vertex(e.to):
+                        backward_root_etf[
+                            (e.elb, g.vertices[e.to].vlb)
+                        ].add(g.gid)
+
+            for elb, vlb in backward_root_etf:
+                if (maxtoc, elb, vlb) in forward_root:
+                    for pdfs in forward_root[(maxtoc, elb, vlb)]:
+                        backward_root_etf[(elb, vlb)].add(pdfs.gid)
+
+                if len(backward_root_etf[(elb, vlb)]) >= self._min_support:
+                    path = self._early_termination_failure_tree.add_nodes_rmpath(self._DFScode, rmpath, list())
+                    path_index = 0
+                    for i, rmpath_i in enumerate(reversed(rmpath)):
+                        frm = self._DFScode[rmpath_i].frm
+                        count = 0
+                        for e in self._DFScode:
+                            if e.frm == frm and e.to > e.frm:
+                                count += 1
+                        if count == 1:
+                            path_index += 1
+                        else:
+                            break
+                    forward_etf_path = path[0: path_index + 1]
+                    break
+
+        # type 3
+        if self._DFScode[-1].to > self._DFScode[-1].frm:
+            for i,rmpath_i in enumerate(rmpath):
+                v_start = self._DFScode[rmpath_i].frm
+                v_end = self._DFScode[rmpath_i].to
+                if v_end == v_start + 1:
+                    continue
+                for j in range(i + 1, len(rmpath)):
+                    rmpath_j = rmpath[j]
+                    v_frm = self._DFScode[rmpath_j].frm
+
+                    for p in projected:
+                        g = self.graphs[p.gid]
+                        history = History(g, p)
+
+                        dfs_to_g_vertices = dict()
+                        g_to_dfs_vertices = dict()
+
+                        for k, e in enumerate(history.edges):
+                            dfs_to_g_vertices[self._DFScode[k].frm] = history.edges[k].frm
+                            dfs_to_g_vertices[self._DFScode[k].to] = history.edges[k].to
+                            g_to_dfs_vertices[history.edges[k].frm] = self._DFScode[k].frm
+                            g_to_dfs_vertices[history.edges[k].to] = self._DFScode[k].to
+
+                        g_rmpath_to_vertices = set()
+
+                        for v in range(v_start + 1, v_end):
+                            g_rmpath_to_vertices.add(dfs_to_g_vertices[v])
+
+                        for to, e in g.vertices[dfs_to_g_vertices[v_frm]].edges.items():
+
+                            if history.has_edge(e.eid):
+                                continue
+
+                            if e.frm != dfs_to_g_vertices[v_frm]:
+                                continue
+
+                            if e.to not in g_rmpath_to_vertices:
+                                continue
+
+                            backward_root_etf_rmpath_gaps[
+                                (v_frm, e.elb, g.vertices[e.to].vlb)
+                            ].add(g.gid)
+
+            for rmpath_frm, elb, vlb in backward_root_etf_rmpath_gaps:
+                if (rmpath_frm, elb, vlb) in forward_root:
+                    for pdfs in forward_root[(rmpath_frm, elb, vlb)]:
+                        backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)].add(pdfs.gid)
+
+                if len(backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)]) >= self._min_support:
+                    path = self._early_termination_failure_tree.add_nodes_rmpath(self._DFScode, rmpath, list())
+                    path_index = 0
+                    for i, rmpath_i in enumerate(reversed(rmpath)):
+                        frm = self._DFScode[rmpath_i].frm
+                        count = 0
+                        for e in self._DFScode:
+                            if e.frm == frm and e.to > e.frm:
+                                count += 1
+                        if count == 1:
+                            path_index += 1
+                        else:
+                            break
+                    forward_etf_path = path[0: path_index + 1]
+                    break
+
+        # type 4
+        if self._DFScode[-1].to > self._DFScode[-1].frm and len(rmpath) > 2 \
+                and self._DFScode[rmpath[-1]].vevlb[1] == self._DFScode[rmpath[-2]].vevlb[1] \
+                and self._DFScode[rmpath[-1]].vevlb[2] == self._DFScode[rmpath[-2]].vevlb[2]:
+            for p in projected:
+                g = self.graphs[p.gid]
+                history = History(g, p)
+
+                g_rmpath_first_vertex = history.edges[rmpath[-1]].frm
+
+                for to, e in g.vertices[history.edges[rmpath[0]].to].edges.items():
+
+                    if history.has_edge(e.eid):
+                        continue
+
+                    if e.frm != history.edges[rmpath[0]].to:
+                        continue
+
+                    if e.to != g_rmpath_first_vertex:
+                        continue
+
+                    backward_root_etf_rmpath_tail[
+                            (e.elb, g.vertices[e.to].vlb)
+                        ].add(g.gid)
+
+            for elb, vlb in backward_root_etf_rmpath_tail:
+                if (maxtoc, elb, vlb) in forward_root:
+                    for pdfs in forward_root[(maxtoc, elb, vlb)]:
+                        backward_root_etf_rmpath_tail[(elb, vlb)].add(pdfs.gid)
+
+                if len(backward_root_etf_rmpath_tail[(elb, vlb)]) >= self._min_support:
+                    path = self._early_termination_failure_tree.add_nodes_rmpath(self._DFScode, rmpath, list())
+                    path_index = 0
+                    for i, rmpath_i in enumerate(reversed(rmpath)):
+                        frm = self._DFScode[rmpath_i].frm
+                        count = 0
+                        for e in self._DFScode:
+                            if e.frm == frm and e.to > e.frm:
+                                count += 1
+                        if count == 1:
+                            path_index += 1
+                        else:
+                            break
+                    forward_etf_path = path[0: path_index + 1]
+                    break
+
+
+
+        # type 5
+        # check if the last edge is backward
+        if self._DFScode[-1].to < self._DFScode[-1].frm:
+            rmpath_loop = None
+            rmpath_loop_index = None
+            for i,rmpath_i in enumerate(rmpath):
+                # if self._DFScode[rmpath_i].to != self._DFScode[-1].to:
+                if self._DFScode[rmpath_i].frm != self._DFScode[-1].to:
+                    continue
+                else:
+                    rmpath_loop = rmpath_i
+                    rmpath_loop_index = i
+                    break
+
+            #if rmpath_loop_index is None:
+            #    if self._DFScode[rmpath[-1]].frm == self._DFScode[-1].to:
+            #        rmpath_loop_index = -1
+
+            for i,rmpath_i in enumerate(rmpath):
+                #if rmpath_i == rmpath_loop:
+                #    break
+                if rmpath_i < rmpath_loop:
+                    break
+
+                elb = self._DFScode[rmpath_i].vevlb[1]
+                vlb = self._DFScode[rmpath_i].vevlb[0]
+                if vlb == VACANT_VERTEX_LABEL:
+                    if i+1 == len(rmpath):
+                        for e in self._DFScode:
+                            if e.frm == self._DFScode[rmpath_i].frm and e.vevlb[0] != VACANT_VERTEX_LABEL:
+                                vlb = e.vevlb[0]
+                                break
+                    else:
+                        vlb = self._DFScode[rmpath[i+1]].vevlb[2]
+
+                for p in projected:
+                    g = self.graphs[p.gid]
+                    history = History(g, p)
+
+                    for to, e in g.vertices[history.edges[rmpath_i].to].edges.items():
+                        if e.elb != elb:
+                            continue
+
+                        if history.has_edge(e.eid):
+                            continue
+
+                        if g.vertices[e.to].vlb != vlb:
+                            continue
+
+                        if history.has_vertex(e.to):
+                            continue
+
+                        reversed_rmpath = list()
+                        reversed_rmpath.append(len(self._DFScode) - 1)
+                        reversed_rmpath.extend(rmpath[0:rmpath_loop_index + 1])
+                        path = self._early_termination_failure_tree.add_nodes_rmpath(self._DFScode, rmpath[rmpath_loop_index + 1:] if rmpath_loop_index + 1 < len(rmpath) else list(), reversed_rmpath)
+                        last_index = len(rmpath) - rmpath_loop_index if rmpath_loop_index < len(rmpath) else 1
+                        backward_etf_path = path[0:last_index]
+                        break
+
+                    if backward_etf_path is not None:
+                        break
+                if backward_etf_path is not None:
+                    break
+
+        # type 6
+        if backward_etf_path is None:
+            dfs_codes = self._DFScode.build_all_dfs_codes()
+            for dfs_code in dfs_codes[1:]:
+                if dfs_code[-1].to < dfs_code[-1].frm:
+                    rmpath_loop = None
+                    rmpath_loop_index = None
+                    for i, rmpath_i in enumerate(dfs_code.rmpath):
+                        # if self._DFScode[rmpath_i].to != self._DFScode[-1].to:
+                        if dfs_code[rmpath_i].frm != dfs_code[-1].to:
+                            continue
+                        else:
+                            rmpath_loop = rmpath_i
+                            rmpath_loop_index = i
+                            break
+
+                    # check symmetry
+                    rmpath_before_loop_index = rmpath_loop_index + 1
+                    if (rmpath_before_loop_index < len(dfs_code.rmpath)):
+                        rmpath_before_loop_index_vlb = dfs_code[dfs_code.rmpath[rmpath_before_loop_index]].vevlb[0]
+                        if rmpath_before_loop_index_vlb == VACANT_VERTEX_LABEL:
+                            vid = dfs_code[dfs_code.rmpath[rmpath_before_loop_index]].frm
+                            for i in range(0, len(dfs_code)):
+                                if dfs_code[i].frm == vid and dfs_code[i].vevlb[0] != VACANT_VERTEX_LABEL:
+                                    rmpath_before_loop_index_vlb = dfs_code[i].vevlb[0]
+                                    break
+                                if dfs_code[i].to == vid and dfs_code[i].vevlb[2] != VACANT_VERTEX_LABEL:
+                                    rmpath_before_loop_index_vlb = dfs_code[i].vevlb[2]
+                                    break
+
+                        rmpath_0_vlb = dfs_code[dfs_code.rmpath[-1]].vevlb[0]
+                        if rmpath_before_loop_index_vlb == VACANT_VERTEX_LABEL:
+                            vid = dfs_code[dfs_code.rmpath[-1]].frm
+                            for i in range(0, len(dfs_code)):
+                                if dfs_code[i].frm == vid and dfs_code[i].vevlb[0] != VACANT_VERTEX_LABEL:
+                                    rmpath_0_vlb = dfs_code[i].vevlb[0]
+                                    break
+                                if dfs_code[i].to == vid and dfs_code[i].vevlb[2] != VACANT_VERTEX_LABEL:
+                                    rmpath_0_vlb = dfs_code[i].vevlb[2]
+                                    break
+
+                        if rmpath_0_vlb != dfs_code[dfs_code.rmpath[rmpath_before_loop_index]].vevlb[2] or \
+                            dfs_code[dfs_code.rmpath[-1]].vevlb[1] != dfs_code[dfs_code.rmpath[rmpath_before_loop_index]].vevlb[1] or \
+                            dfs_code[dfs_code.rmpath[-1]].vevlb[2] != rmpath_before_loop_index_vlb:
+                            continue
+                    # if rmpath_loop_index is None:
+                    #    if self._DFScode[rmpath[-1]].frm == self._DFScode[-1].to:
+                    #        rmpath_loop_index = -1
+
+                    dfs_code_projected = self._projected_tail(projected, len(self._DFScode) - len(dfs_code))
+
+                    for i, rmpath_i in enumerate(dfs_code.rmpath):
+                        # if rmpath_i == rmpath_loop:
+                        #    break
+                        if rmpath_i < rmpath_loop:
+                            break
+
+                        elb = dfs_code[rmpath_i].vevlb[1]
+                        vlb = dfs_code[rmpath_i].vevlb[0]
+                        if vlb == VACANT_VERTEX_LABEL:
+                            if i + 1 == len(dfs_code.rmpath):
+                                for e in dfs_code:
+                                    if e.frm == dfs_code[rmpath_i].frm and e.vevlb[0] != VACANT_VERTEX_LABEL:
+                                        vlb = e.vevlb[0]
+                                        break
+                            else:
+                                vlb = dfs_code[dfs_code.rmpath[i + 1]].vevlb[2]
+
+                        for p in dfs_code_projected:
+                            g = self.graphs[p.gid]
+                            history = History(g, p)
+
+                            for to, e in g.vertices[history.edges[rmpath_i].to].edges.items():
+                                if e.elb != elb:
+                                    continue
+
+                                if history.has_edge(e.eid):
+                                    continue
+
+                                if g.vertices[e.to].vlb != vlb:
+                                    continue
+
+                                if history.has_vertex(e.to):
+                                    continue
+
+                                reversed_rmpath = list()
+                                reversed_rmpath.append(len(dfs_code) - 1)
+                                reversed_rmpath.extend(dfs_code.rmpath[0:rmpath_loop_index + 1])
+                                path = self._early_termination_failure_tree.add_nodes_rmpath(dfs_code, dfs_code.rmpath[
+                                                                                                            rmpath_loop_index + 1:] if rmpath_loop_index + 1 < len(
+                                    dfs_code.rmpath) else list(), reversed_rmpath)
+                                last_index = len(dfs_code.rmpath) - rmpath_loop_index if rmpath_loop_index < len(dfs_code.rmpath) else 1
+                                backward_etf_path = path[0:last_index]
+                                break
+
+                            if backward_etf_path is not None:
+                                break
+                        if backward_etf_path is not None:
+                            break
+                    if backward_etf_path is not None:
+                        break
+
+# end types
+
+        if forward_etf_path is not None or backward_etf_path is not None:
+            self.etfDFScodes.append(self._DFScode.copy())
+
+        return forward_etf_path, backward_etf_path
+
+    def _terminate_early1(self, maxtoc, forward_root, backward_root):
+        vlbs = self._DFScode.vertex_labels()
+        for forward_edge in forward_root.keys():
+            toc = forward_edge[0]
+            if toc != maxtoc:
+                continue
+            felb = forward_edge[1]
+            fvlb = forward_edge[2]
+            gids = set()
+            for pdfs in forward_root[forward_edge]:
+                gids.add(pdfs.gid)
+            found_in_backward = False
+            for backward_edge in backward_root.keys():
+                belb = backward_edge[1]
+                if belb != felb:
+                    continue
+                bvlb = vlbs[backward_edge[0]]
+                if bvlb != fvlb:
+                    continue
+                for pdfs in backward_root[backward_edge]:
+                    found_in_backward = True
+                    gids.add(pdfs.gid)
+            if found_in_backward and len(gids) >= self._min_support:
+                print("early termination failure detected")
+                return True
+        print("early termination failure not detected")
+        return False
+
+    def _terminate_early3(self, projected):
+        projected_edges, g, edge = self._collect_projected_edges(projected)
+        frmlbl, edgelbl, tolbl = g._get_DFSLabels(edge)
+        dfs_labels = DFSlabel(frmlbl=frmlbl, edgelbl=edgelbl, tolbl=tolbl)
+
+        # Check if set of projected edges already exists in the values of the specified key
+        # return true if yes, false otherwise
+        set_of_proj_edges = frozenset(projected_edges)
+        if dfs_labels not in self.edge_projection_sets:
+            return False, False
+        set_of_sets = self.edge_projection_sets[dfs_labels]
+        if not set_of_proj_edges in set_of_sets:
+            return False, False
+
+        early_termination = False
+        if set_of_proj_edges in set_of_sets:
+            where_projections = self._get_where_projections(projected)
+            where_projections = sorted(where_projections)
+            support_projections = len(where_projections)
+            projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(
+                projected)
+
+            edges_directions = self._DFScode.edges_directions()
+
+            termination_by_dfs = False
+            should_allow_early_termination = True
+            for g in self.edge_projection_sets_closed_graphs[set_of_proj_edges]:
+                has_equivalent_occurrence, preserves_directions, isomorphism = g.check_equivalent_occurrence(support_projections,
+                                                                                                where_projections,
+                                                                                                projected_edges_lists,
+                                                                                                edges_directions)
+                if not has_equivalent_occurrence:
+                    continue
+
+                should_allow_early_termination_1 = self._early_termination_failure_tree.should_allow_early_terminations(self._DFScode, self._DFScode.rmpath, g.gid)
+                if not should_allow_early_termination_1:
+                    should_allow_early_termination = False
+
+                max_dfs_index = 0
+                for index in isomorphism.values():
+                    if len(g.DFScode) - index > max_dfs_index:
+                        max_dfs_index = len(g.DFScode) - index
+                dfs = g.DFScode[0:max_dfs_index]
+                for etfDFScode in self.etfDFScodes:
+                    if len(etfDFScode) < max_dfs_index:
+                        continue
+                    #if dfs == etfDFScode:
+                    if dfs == etfDFScode[0:max_dfs_index]:
+                        termination_by_dfs = True
+                        break
+
+                ###if not should_allow_early_termination:
+                ####    return False, True
+
+                early_termination = True
+                print("dfs code ", self._DFScode, " terminated by gid ", g.gid, " early termination failure ", termination_by_dfs)
+
+        ####
+        #### if not should_allow_early_termination:
+        ####    early_termination = False
+        ###
+
+        if termination_by_dfs:
+            early_termination = False
+
+        ### return early_termination, not should_allow_early_termination
+        return early_termination, termination_by_dfs
+
     def _terminate_early(self, projected):
         """
         Checks if the subgraph mining should end early.
         """
+
+        this_early_termination_failure_causing_graphs = list()
+        this_terminating_graphs = list()
 
         projected_edges, g, edge = self._collect_projected_edges(projected)
         frmlbl, edgelbl, tolbl = g._get_DFSLabels(edge)
@@ -1059,44 +1634,49 @@ class closeGraph(object):
         # return true if yes, false otherwise
         set_of_proj_edges = frozenset(projected_edges)
         if dfs_labels not in self.edge_projection_sets:
-            return False
-        else:
-            set_of_sets = self.edge_projection_sets[dfs_labels]
-            if set_of_proj_edges in set_of_sets:
-                if self._mode == CloseGraphMode.EarlyTerminationFailure:
-                    return self._terminate_early_termination_failure(projected)
-                else:
-                    print("early termination")
-                    where_projections = self._get_where_projections(projected)
-                    where_projections = sorted(where_projections)
-                    support_projections = len(where_projections)
-                    projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(
-                        projected)
-                    can_be_descendant_of = False
-                    for gid in self._early_termination_failure_causing_graphs:
-                        can_be_descendant_of = self._early_termination_failure_causing_graphs[gid].can_be_descendant_of(support_projections, where_projections, projected_edges_lists)
-                        if can_be_descendant_of:
-                            break
-                    for g in self.edge_projection_sets_closed_graphs[set_of_proj_edges]:
-                        if g.gid in self._early_termination_failure_causing_graphs:
-                            continue
-                        edges_directions = self._DFScode.edges_directions()
-                        has_equivalent_occurrence, preserves_directions = g.check_equivalent_occurrence(support_projections, where_projections, projected_edges_lists, edges_directions)
-                        if not has_equivalent_occurrence:
-                            print("equivalent occurrence not verified gid ",g.gid)
-                        else:
-                            if can_be_descendant_of:
-                                self._early_termination_failure_causing_graphs[g.gid] = g
-                                print("equivalent occurrence can be ancestor of gid ", g.gid)
-                            else:
-                                if preserves_directions:
-                                    print("equivalent occurrence verified gid ", g.gid)
-                                    return True
-                                self._early_termination_failure_causing_graphs[g.gid] = g
-                                print("number closed graphs ", len(self._frequent_subgraphs), "number early terminating graphs ", len(self._early_termination_failure_causing_graphs))
-                    return False  # Early Termination case
-            else:
-                return False
+            return False, this_early_termination_failure_causing_graphs
+        set_of_sets = self.edge_projection_sets[dfs_labels]
+        if not set_of_proj_edges in set_of_sets:
+            return False, this_early_termination_failure_causing_graphs
+        if set_of_proj_edges in set_of_sets:
+            where_projections = self._get_where_projections(projected)
+            where_projections = sorted(where_projections)
+            support_projections = len(where_projections)
+            projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(
+                projected)
+
+            edges_directions = self._DFScode.edges_directions()
+            early_termination = False
+            for g in self.edge_projection_sets_closed_graphs[set_of_proj_edges]:
+                has_equivalent_occurrence, preserves_directions, isomorphism = g.check_equivalent_occurrence(support_projections, where_projections, projected_edges_lists, edges_directions)
+                if not has_equivalent_occurrence:
+                    continue
+
+
+                if not preserves_directions and g.gid > self._frequent_graph_gid_before_root:
+                    early_termination = False
+                    this_early_termination_failure_causing_graphs.append(g.gid)
+                    continue
+                if g.gid in self._early_termination_failure_causing_graphs and g.gid > self._frequent_graph_gid_before_root:
+                    early_termination = False
+                    this_early_termination_failure_causing_graphs.append(g.gid)
+                    continue
+
+                this_terminating_graphs.append(g.gid)
+                if len(this_early_termination_failure_causing_graphs) == 0:
+                    early_termination = True
+
+            if early_termination:
+                for gid in self._early_termination_failure_causing_graphs:
+                    can_be_descendant_of = self._early_termination_failure_causing_graphs[gid].can_be_descendant_of(
+                        support_projections, where_projections, projected_edges_lists)
+                    if can_be_descendant_of:
+                        this_early_termination_failure_causing_graphs.extend(this_terminating_graphs)
+                        early_termination = False
+                        break
+
+            return early_termination, this_early_termination_failure_causing_graphs
+
 
     def _projected_to_edges_projection_set(self, projected):
         edges_projection_set = dict()

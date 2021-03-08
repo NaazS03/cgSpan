@@ -53,6 +53,16 @@ def main(FLAGS=None):
     cg.run()
     cg.time_stats()
 
+    '''
+    db = cg._write_graphs()
+
+    head, tail = os.path.split(FLAGS.database_file_name)
+
+    db_file = open(head + "/normalized_" + tail, "w")
+    db_file.write(db)
+    db_file.close()
+    '''
+
     closed_graphs = list()
     for g in cg._frequent_subgraphs:
         closed_graphs.append(g)

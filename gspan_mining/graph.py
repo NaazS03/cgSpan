@@ -237,6 +237,7 @@ class FrequentGraph(Graph):
                  where_projections,
                  pdfs_edges_projection_set,
                  pdfs_edges_projection_list,
+                 DFScode,
                  example_gid,
                  gid=VACANT_GRAPH_ID,
                  is_undirected=True,
@@ -250,6 +251,7 @@ class FrequentGraph(Graph):
         self.support_projections = len(where_projections)
         self.pdfs_edges_projection_set = pdfs_edges_projection_set
         self.pdfs_edges_projection_list = pdfs_edges_projection_list
+        self.DFScode = DFScode
         self.example_gid = example_gid
 
     def is_supergraph_of_with_support_graphs(self, g):
@@ -274,21 +276,21 @@ class FrequentGraph(Graph):
 
     def is_supergraph_of_with_support_projections(self, g):
         if self.support_projections < g.support_projections:
-            return False, False
+            return False, False, None
 
         if self.where_projections_set != g.where_projections_set:
-            return False, False
+            return False, False, None
 
         if not set(self.edges_projection_sets.keys()).issuperset(set(g.edges_projection_sets.keys())):
-            return False, False
+            return False, False, None
         return self.check_equivalent_occurrence(g.support_projections, g.where_projections, g.pdfs_edges_projection_list, g.dfs_code_edges_directions)
 
     def check_equivalent_occurrence(self, support_projections, where_projections, pdfs_edges_projection_list, edges_directions):
         if self.support_projections < support_projections:
-            return False, False
+            return False, False, None
 
         if set(self.where_projections) != set(where_projections):
-            return False, False
+            return False, False, None
 
         #if not edges_projection_sets is None:
         #    if not self.edges_projection_sets.keys().issuperset(edges_projection_sets.keys()):
@@ -300,6 +302,7 @@ class FrequentGraph(Graph):
         possible_isomorphisms = self.find_possible_isomorphisms(pdfs_edges_projection_list[self.example_gid])
         isomorphism_found = False
         preserves_directions = False
+        isomorphism = None
         for isomorphism in possible_isomorphisms:
             for gid in pdfs_edges_projection_list.keys():
                 for other_edges_projections_list in pdfs_edges_projection_list[gid]:
@@ -326,7 +329,7 @@ class FrequentGraph(Graph):
                         break
                 break
 
-        return isomorphism_found, preserves_directions
+        return isomorphism_found, preserves_directions, isomorphism
 
     def find_possible_isomorphisms(self, edges_projection_list):
         possible_isomorphisms = list()
