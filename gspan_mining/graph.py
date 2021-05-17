@@ -395,13 +395,3 @@ class FrequentGraph(Graph):
                 if len(isomorphism) == len(other_projected_edges):
                     possible_isomorphisms.append(isomorphism)
         return possible_isomorphisms
-
-    def has_edge_projection_set(self, dfs_labels, set_of_proj_edges):
-        if dfs_labels not in self.edges_projection_sets:
-            return False
-        else:
-            set_of_sets = self.edges_projection_sets[dfs_labels]
-            if set_of_proj_edges in set_of_sets:
-                return True
-            else:
-                return False
