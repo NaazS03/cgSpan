@@ -235,7 +235,6 @@ class FrequentGraph(Graph):
                  edges_projection_sets,
                  where_graphs,
                  where_projections,
-                 pdfs_edges_projection_set,
                  pdfs_edges_projection_list,
                  DFScode,
                  example_gid,
@@ -249,41 +248,15 @@ class FrequentGraph(Graph):
         self.where_projections = sorted(where_projections)
         self.where_projections_set = set(where_projections)
         self.support_projections = len(where_projections)
-        self.pdfs_edges_projection_set = pdfs_edges_projection_set
         self.pdfs_edges_projection_list = pdfs_edges_projection_list
         self.DFScode = DFScode
         self.example_gid = example_gid
+        self.pdfs_edges_all = set()
+        for pdfs_edge_lists in pdfs_edges_projection_list.values():
+            for pdfs_edge_list in pdfs_edge_lists:
+                for pdfs_edge in pdfs_edge_list:
+                    self.pdfs_edges_all.add(pdfs_edge)
 
-    def is_supergraph_of_with_support_graphs(self, g):
-        if self.support_graphs != g.support_graphs:
-            return False
-
-        if set(self.where_graphs) != set(g.where_graphs):
-            return False
-
-        if not self.edges_projection_sets.keys().issuperset(g.edges_projection_sets.keys()):
-            return False
-
-        if self.get_num_vertices() < g.get_num_vertices():
-            return False
-
-        for my_pdfs in self.example_pdfs_edges_projection_set:
-            for other_pdfs in g.example_pdfs_edges_projection_set:
-                if my_pdfs.issuperset(other_pdfs):
-                    return True
-            # we need to check only on one example
-            return False
-
-    def is_supergraph_of_with_support_projections(self, g):
-        if self.support_projections < g.support_projections:
-            return False, False, None
-
-        if self.where_projections_set != g.where_projections_set:
-            return False, False, None
-
-        if not set(self.edges_projection_sets.keys()).issuperset(set(g.edges_projection_sets.keys())):
-            return False, False, None
-        return self.check_equivalent_occurrence(g.support_projections, g.where_projections, g.pdfs_edges_projection_list, g.dfs_code_edges_directions)
 
     def check_equivalent_occurrence(self, support_projections, where_projections, pdfs_edges_projection_list, edges_directions):
         if self.support_projections < support_projections:
@@ -292,6 +265,16 @@ class FrequentGraph(Graph):
         if set(self.where_projections) != set(where_projections):
             return False, False, None
 
+        '''
+        pdfs_edges_all = set()
+        for pdfs_edge_lists in pdfs_edges_projection_list.values():
+            for pdfs_edge_list in pdfs_edge_lists:
+                for pdfs_edge in pdfs_edge_list:
+                    pdfs_edges_all.add(pdfs_edge)
+
+        if not pdfs_edges_all.issubset(self.pdfs_edges_all):
+            return False, False, None
+        '''
         #if not edges_projection_sets is None:
         #    if not self.edges_projection_sets.keys().issuperset(edges_projection_sets.keys()):
         #        return False
@@ -345,42 +328,6 @@ class FrequentGraph(Graph):
                 possible_isomorphisms.append(isomorphism)
         return possible_isomorphisms
 
-    def can_be_descendant_of(self, support_projections, where_projections, pdfs_edges_projection_list):
-
-        if not set(self.where_projections).issubset(set(where_projections)):
-            return False
-
-        #if not edges_projection_sets is None:
-        #    if not self.edges_projection_sets.keys().issuperset(edges_projection_sets.keys()):
-        #        return False
-
-        #if self.get_num_vertices() < num_vertices:
-        #    return False
-
-        possible_isomorphisms = self.find_possible_isomorphisms_all(pdfs_edges_projection_list[self.example_gid])
-        isomorphism_found = False
-
-        for isomorphism in possible_isomorphisms:
-            for gid in self.pdfs_edges_projection_list.keys():
-                for my_edges_projections_list in self.pdfs_edges_projection_list[gid]:
-                    isomorphism_found = True
-                    for other_edges_projections_list in pdfs_edges_projection_list[gid]:
-                        isomorphism_found = True
-                        for other_index in isomorphism.keys():
-                            my_index = isomorphism[other_index]
-                            if other_edges_projections_list[other_index] != my_edges_projections_list[my_index]:
-                                isomorphism_found = False
-                                break
-                        if isomorphism_found:
-                            break
-                    if not isomorphism_found:
-                        break
-                if not isomorphism_found:
-                    break
-            if isomorphism_found:
-                break
-
-        return isomorphism_found
 
     def find_possible_isomorphisms_all(self, edges_projection_list):
         possible_isomorphisms = list()

@@ -18,7 +18,9 @@ from graph import DatabaseGraph
 from graph import FrequentGraph
 from graph import DFSlabel
 from graph import EdgeDirection
-from early_termination_failure import EarlyTerminationFailureTree
+from dfscode import DFSedge
+from dfscode import DFScode
+from trie import Trie
 
 import pandas as pd
 
@@ -42,191 +44,6 @@ class CloseGraphMode(enum.Enum):
 class SupportMode(enum.Enum):
     Projections = 1
     Graphs = 2
-
-
-class DFSedge(object):
-    """DFSedge class."""
-
-    def __init__(self, frm, to, vevlb):
-        """Initialize DFSedge instance."""
-        self.frm = frm
-        self.to = to
-        self.vevlb = vevlb
-
-    def __eq__(self, other):
-        """Check equivalence of DFSedge."""
-        return (self.frm == other.frm and
-                self.to == other.to and
-                self.vevlb == other.vevlb)
-
-    def __ne__(self, other):
-        """Check if not equal."""
-        return not self.__eq__(other)
-
-    def __repr__(self):
-        """Represent DFScode in string way."""
-        return '(frm={}, to={}, vevlb={})'.format(
-            self.frm, self.to, self.vevlb
-        )
-
-
-class DFScode(list):
-    """DFScode is a list of DFSedge."""
-
-    def __init__(self, orig=None, last_index=None):
-        """Initialize DFScode."""
-        if orig is None:
-            self.rmpath = list()
-        else:
-            for i in range(0, last_index):
-                self.append(orig[i])
-            self.rmpath = list()
-
-    def __eq__(self, other):
-        """Check equivalence of DFScode."""
-        la, lb = len(self), len(other)
-        if la != lb:
-            return False
-        for i in range(la):
-            if self[i] != other[i]:
-                return False
-        return True
-
-    def __ne__(self, other):
-        """Check if not equal."""
-        return not self.__eq__(other)
-
-    def __repr__(self):
-        """Represent DFScode in string way."""
-        return ''.join(['[', ','.join(
-            [str(dfsedge) for dfsedge in self]), ']']
-                       )
-
-    def push_back(self, frm, to, vevlb):
-        """Update DFScode by adding one edge."""
-        self.append(DFSedge(frm, to, vevlb))
-        return self
-
-    def to_graph(self, gid=VACANT_GRAPH_ID, is_undirected=True):
-        """Construct a graph according to the dfs code."""
-        g = Graph(gid,
-                  is_undirected=is_undirected,
-                  eid_auto_increment=True)
-        for dfsedge in self:
-            frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
-            if vlb1 != VACANT_VERTEX_LABEL:
-                g.add_vertex(frm, vlb1)
-            if vlb2 != VACANT_VERTEX_LABEL:
-                g.add_vertex(to, vlb2)
-            g.add_edge(AUTO_EDGE_ID, frm, to, elb)
-        g.dfs_code_edges_directions = self.edges_directions()
-        return g
-
-    def to_frequent_graph(self, graph_edges_projection_sets, where_graphs, where_projections,
-                          projected_edges_sets, projected_edges_lists,  DFScode, example_gid, gid=VACANT_GRAPH_ID, is_undirected=True):
-        """Construct a graph according to the dfs code."""
-        g = FrequentGraph(graph_edges_projection_sets,
-                          where_graphs,
-                          where_projections,
-                          projected_edges_sets,
-                          projected_edges_lists,
-                          DFScode.copy(),
-                          example_gid,
-                          gid,
-                          is_undirected=is_undirected,
-                          eid_auto_increment=True)
-        for dfsedge in self:
-            frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
-            if vlb1 != VACANT_VERTEX_LABEL:
-                g.add_vertex(frm, vlb1)
-            if vlb2 != VACANT_VERTEX_LABEL:
-                g.add_vertex(to, vlb2)
-            g.add_edge(AUTO_EDGE_ID, frm, to, elb)
-        g.dfs_code_edges_directions = self.edges_directions()
-        return g
-
-    def edges_directions(self):
-        directions = list()
-        for dfsedge in reversed(self):
-            frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
-            if frm < to:
-                directions.append(EdgeDirection.Forward)
-            else:
-                directions.append(EdgeDirection.Backward)
-        return directions
-
-    def from_graph(self, g):
-        """Build DFScode from graph `g`."""
-        raise NotImplementedError('Not inplemented yet.')
-
-    def build_rmpath(self):
-        """Build right most path."""
-        self.rmpath = list()
-        old_frm = None
-        for i in range(len(self) - 1, -1, -1):
-            dfsedge = self[i]
-            frm, to = dfsedge.frm, dfsedge.to
-            if frm < to and (old_frm is None or to == old_frm):
-                self.rmpath.append(i)
-                old_frm = frm
-        return self
-
-    def build_all_dfs_codes(self):
-        """Build right most path."""
-        dfs_codes = list()
-        dfs_codes.append(self)
-        old_frm = None
-        for i in range(len(self) - 1, -1, -1):
-            dfsedge = self[i]
-            frm, to = dfsedge.frm, dfsedge.to
-            if frm < to and (old_frm is None or to == old_frm):
-                old_frm = frm
-                continue
-            else:
-                if frm > to and (old_frm is None or frm == old_frm):
-                    continue
-                else:
-                    old_frm = frm
-                    dfs_code = DFScode(self, i + 1)
-                    dfs_codes.append(dfs_code)
-
-        for dfs_code in dfs_codes:
-            dfs_code.build_rmpath()
-
-        return dfs_codes
-
-    def get_num_vertices(self):
-        """Return number of vertices in the corresponding graph."""
-        return len(set(
-            [dfsedge.frm for dfsedge in self] +
-            [dfsedge.to for dfsedge in self]
-        ))
-
-    def set_root_minimal_labels(self):
-        if len(self) == 0:
-            return
-        dfsedge = self[0];
-        frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
-        dfsedge.vevlb = ('0', '0', vlb2)
-        return vlb1, elb
-
-    def restore_root_original_labels(self, vlb1, elb):
-        if len(self) == 0:
-            return
-        dfsedge = self[0];
-        frm, to, (min_vlb1, min_elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
-        dfsedge.vevlb = (vlb1, elb, vlb2)
-        return
-
-    def vertex_labels(self):
-        vlbs = dict()
-        for e in self:
-            if e.vevlb[0] != VACANT_VERTEX_LABEL:
-                vlbs[e.frm] = e.vevlb[0]
-            if e.vevlb[2] != VACANT_VERTEX_LABEL:
-                vlbs[e.to] = e.vevlb[2]
-        return vlbs
-
 
 class PDFS(object):
     """PDFS class."""
@@ -338,7 +155,8 @@ class closeGraph(object):
         self._report_df_cumulative = pd.DataFrame()
         self.i = 0
         self._current_frequent_gid = -1
-        self.etfDFScodes = list()
+        #self.etfDFScodes = list()
+        self.trie = Trie()
 
     def time_stats(self):
         """Print stats of time."""
@@ -857,10 +675,11 @@ class closeGraph(object):
         self._DFScode.build_rmpath()
         early_termination, early_termination_failure = self._early_termination(projected)
         if early_termination:
-            print(self.i, " early termination")
+            print(self.i, " early termination#")
             return
         else:
-            print(self.i, " early termination failure")
+            if early_termination_failure:
+                print(self.i, " early termination failure")
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()
@@ -959,12 +778,11 @@ class closeGraph(object):
         graph_edges_projection_set = self._projected_to_edges_projection_set(projected)
         where_graphs = self._get_where_graphs(projected)
         where_projections = self._get_where_projections(projected)
-        projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(projected)
+        projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(projected)
         self._current_frequent_gid = next(self._counter)
         g = self._DFScode.to_frequent_graph(graph_edges_projection_set,
                                             where_graphs,
                                             where_projections,
-                                            projected_edges_sets,
                                             projected_edges_lists,
                                             self._DFScode,
                                             max_gid,
@@ -1041,7 +859,8 @@ class closeGraph(object):
                         backward_root_etf[(elb, vlb)].add(pdfs.gid)
 
                 if len(backward_root_etf[(elb, vlb)]) >= self._min_support:
-                    self.etfDFScodes.append(self._DFScode.copy())
+                    #self.etfDFScodes.append(self._DFScode.copy())
+                    self.trie.insert(self._DFScode.copy())
                     return
 
         # type 3
@@ -1094,7 +913,8 @@ class closeGraph(object):
                         backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)].add(pdfs.gid)
 
                 if len(backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)]) >= self._min_support:
-                    self.etfDFScodes.append(self._DFScode.copy())
+                    #self.etfDFScodes.append(self._DFScode.copy())
+                    self.trie.insert(self._DFScode.copy())
                     return
 
         # type 4
@@ -1128,7 +948,8 @@ class closeGraph(object):
                         backward_root_etf_rmpath_tail[(elb, vlb)].add(pdfs.gid)
 
                 if len(backward_root_etf_rmpath_tail[(elb, vlb)]) >= self._min_support:
-                    self.etfDFScodes.append(self._DFScode.copy())
+                    #self.etfDFScodes.append(self._DFScode.copy())
+                    self.trie.insert(self._DFScode.copy())
                     return
 
         # type 5
@@ -1177,7 +998,8 @@ class closeGraph(object):
                         if history.has_vertex(e.to):
                             continue
 
-                        self.etfDFScodes.append(self._DFScode.copy())
+                        #self.etfDFScodes.append(self._DFScode.copy())
+                        self.trie.insert(self._DFScode.copy())
                         return
 
         # type 6
@@ -1260,7 +1082,8 @@ class closeGraph(object):
                             if history.has_vertex(e.to):
                                 continue
 
-                            self.etfDFScodes.append(self._DFScode.copy())
+                            #self.etfDFScodes.append(self._DFScode.copy())
+                            self.trie.insert(self._DFScode.copy())
                             return
 
     def _early_termination(self, projected):
@@ -1276,12 +1099,12 @@ class closeGraph(object):
         where_projections = self._get_where_projections(projected)
         where_projections = sorted(where_projections)
         support_projections = len(where_projections)
-        projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(
+        projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(
             projected)
 
         edges_directions = self._DFScode.edges_directions()
 
-        termination_by_dfs = False
+        reject_early_termination = False
 
         for g in self.edge_projection_sets_closed_graphs[set_of_proj_edges]:
             has_equivalent_occurrence, preserves_directions, isomorphism = g.check_equivalent_occurrence(support_projections,
@@ -1291,6 +1114,7 @@ class closeGraph(object):
             if not has_equivalent_occurrence:
                 continue
 
+            '''
             max_dfs_index = 0
             for index in isomorphism.values():
                 if len(g.DFScode) - index > max_dfs_index:
@@ -1305,15 +1129,40 @@ class closeGraph(object):
                     termination_by_dfs = True
                     break
 
-
+            '''
+            reject_early_termination = self._reject_early_termination(g, isomorphism)
+            if reject_early_termination:
+                break
             early_termination = True
             #print("dfs code ", self._DFScode, " terminated by gid ", g.gid, " early termination failure ", termination_by_dfs)
 
-        if termination_by_dfs:
+        if reject_early_termination:
             early_termination = False
 
-        return early_termination, termination_by_dfs
+        return early_termination, reject_early_termination
 
+    def _reject_early_termination(self, g, isomorphism):
+        max_dfs_index = 0
+        for index in isomorphism.values():
+            if len(g.DFScode) - index > max_dfs_index:
+                max_dfs_index = len(g.DFScode) - index
+        dfs = g.DFScode[0:max_dfs_index]
+        is_in_trie = self.trie.search(dfs)
+        return is_in_trie
+        '''
+        for etfDFScode in self.etfDFScodes:
+            if len(etfDFScode) < max_dfs_index:
+                continue
+
+            if dfs == etfDFScode[0:max_dfs_index]:
+                # if dfs == etfDFScode:
+                if not is_in_trie:
+                    print("!!!!!!!!!!!!!!!!!!!!!!!! trie error")
+                return True
+        if is_in_trie:
+            print("!!!!!!!!!!!!!!!!!!!!!!!! trie error")
+        return False
+        '''
 
     def _projected_to_edges_projection_set(self, projected):
         edges_projection_set = set()
@@ -1364,13 +1213,11 @@ class closeGraph(object):
             if pdfs.gid > max_gid:
                 max_gid = pdfs.gid
 
-        projected_edges_sets = dict()
         projected_edges_lists = dict()
 
         for pdfs in projected:
             gid = pdfs.gid
-            if not gid in projected_edges_sets:
-                projected_edges_sets[gid] = set()
+            if not gid in projected_edges_lists:
                 projected_edges_lists[gid] = list()
 
             pdfs_projected = list()
@@ -1379,7 +1226,5 @@ class closeGraph(object):
                 pdfs_projected.append(enumerated_edge)
                 pdfs = pdfs.prev
             projected_edges_lists[gid].append(pdfs_projected)
-            set_of_proj_edges = frozenset(pdfs_projected)
-            projected_edges_sets[gid].add(set_of_proj_edges)
-        return projected_edges_sets, projected_edges_lists, max_gid
+        return projected_edges_lists, max_gid
 
