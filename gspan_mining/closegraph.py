@@ -675,11 +675,11 @@ class closeGraph(object):
         self._DFScode.build_rmpath()
         early_termination, early_termination_failure = self._early_termination(projected)
         if early_termination:
-            print(self.i, " early termination#")
+            #print(self.i, " early termination#")
             return
-        else:
-            if early_termination_failure:
-                print(self.i, " early termination failure")
+        #else:
+        #    if early_termination_failure:
+        #        print(self.i, " early termination failure")
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()

@@ -62,7 +62,7 @@ def main(FLAGS=None):
     db_file.write(db)
     db_file.close()
     '''
-
+    '''
     closed_graphs = list()
     for g in cg._frequent_subgraphs:
         closed_graphs.append(g)
@@ -71,6 +71,7 @@ def main(FLAGS=None):
         g.display()
         print("projections ", g.support_projections, " vertices ", g.get_num_vertices())
         print("------------------")
+    '''
     return cg
 
 
