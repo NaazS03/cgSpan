@@ -858,12 +858,13 @@ class closeGraph(object):
                     for pdfs in forward_root[(maxtoc, elb, vlb)]:
                         backward_root_etf[(elb, vlb)].add(pdfs.gid)
 
-                if len(backward_root_etf[(elb, vlb)]) >= self._min_support:
+                #if len(backward_root_etf[(elb, vlb)]) >= self._min_support:
+                if len(set(backward_root_etf[(elb, vlb)])) >= self._min_support:
                     #self.etfDFScodes.append(self._DFScode.copy())
                     self.trie.insert(self._DFScode.copy())
                     return
 
-        # type 3
+        # type 2
         if self._DFScode[-1].to > self._DFScode[-1].frm:
             for i,rmpath_i in enumerate(rmpath):
                 v_start = self._DFScode[rmpath_i].frm
@@ -912,12 +913,13 @@ class closeGraph(object):
                     for pdfs in forward_root[(rmpath_frm, elb, vlb)]:
                         backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)].add(pdfs.gid)
 
-                if len(backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)]) >= self._min_support:
+                #if len(backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)]) >= self._min_support:
+                if len(set(backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)])) >= self._min_support:
                     #self.etfDFScodes.append(self._DFScode.copy())
                     self.trie.insert(self._DFScode.copy())
                     return
 
-        # type 4
+        # type 3
         if self._DFScode[-1].to > self._DFScode[-1].frm and len(rmpath) > 2 \
                 and self._DFScode[rmpath[-1]].vevlb[1] == self._DFScode[rmpath[-2]].vevlb[1] \
                 and self._DFScode[rmpath[-1]].vevlb[2] == self._DFScode[rmpath[-2]].vevlb[2]:
@@ -947,12 +949,13 @@ class closeGraph(object):
                     for pdfs in forward_root[(maxtoc, elb, vlb)]:
                         backward_root_etf_rmpath_tail[(elb, vlb)].add(pdfs.gid)
 
-                if len(backward_root_etf_rmpath_tail[(elb, vlb)]) >= self._min_support:
+                #if len(backward_root_etf_rmpath_tail[(elb, vlb)]) >= self._min_support:
+                if len(set(backward_root_etf_rmpath_tail[(elb, vlb)])) >= self._min_support:
                     #self.etfDFScodes.append(self._DFScode.copy())
                     self.trie.insert(self._DFScode.copy())
                     return
 
-        # type 5
+        # type 4
         # check if the last edge is backward
         if self._DFScode[-1].to < self._DFScode[-1].frm:
             rmpath_loop = None
@@ -1002,7 +1005,7 @@ class closeGraph(object):
                         self.trie.insert(self._DFScode.copy())
                         return
 
-        # type 6
+        # type 5
 #        if backward_etf_path is None:
         dfs_codes = self._DFScode.build_all_dfs_codes()
         for dfs_code in dfs_codes[1:]:
