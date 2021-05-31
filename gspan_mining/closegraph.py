@@ -151,7 +151,7 @@ class closeGraph(object):
                   'Set max_num_vertices = min_num_vertices.')
             self._max_num_vertices = self._min_num_vertices
         self._report_df = pd.DataFrame()
-        self.edge_projection_sets_closed_graphs = dict()
+        self.closed_graphs_hash_table = dict()
         self._report_df_cumulative = pd.DataFrame()
         self.i = 0
         self._current_frequent_gid = -1
@@ -775,12 +775,12 @@ class closeGraph(object):
         if has_equivalent_extended_occurrence:
             return
 
-        graph_edges_projection_set = self._projected_to_edges_projection_set(projected)
+        edges_hash_keys = self._create_edges_hash_keys(projected)
         where_graphs = self._get_where_graphs(projected)
         where_projections = self._get_where_projections(projected)
         projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(projected)
         self._current_frequent_gid = next(self._counter)
-        g = self._DFScode.to_frequent_graph(graph_edges_projection_set,
+        g = self._DFScode.to_frequent_graph(edges_hash_keys,
                                             where_graphs,
                                             where_projections,
                                             projected_edges_lists,
@@ -789,7 +789,7 @@ class closeGraph(object):
                                             gid=self._current_frequent_gid,
                                             is_undirected=self._is_undirected)
 
-        self._add_closed_graph_to_projection_set(g)  # before reporting update the dictionary
+        self._add_closed_graph(g)  # before reporting update the dictionary
         self._report(g)
 
         return
@@ -1092,9 +1092,9 @@ class closeGraph(object):
     def _early_termination(self, projected):
         projected_edges, g, edge = self._collect_projected_edges(projected)
 
-        set_of_proj_edges = frozenset(projected_edges)
+        edge_hash_key = frozenset(projected_edges)
 
-        if not set_of_proj_edges in self.edge_projection_sets_closed_graphs:
+        if not edge_hash_key in self.closed_graphs_hash_table:
             return False, False
 
         early_termination = False
@@ -1109,7 +1109,7 @@ class closeGraph(object):
 
         reject_early_termination = False
 
-        for g in self.edge_projection_sets_closed_graphs[set_of_proj_edges]:
+        for g in self.closed_graphs_hash_table[edge_hash_key]:
             has_equivalent_occurrence, preserves_directions, isomorphism = g.check_equivalent_occurrence(support_projections,
                                                                                             where_projections,
                                                                                             projected_edges_lists,
@@ -1167,38 +1167,38 @@ class closeGraph(object):
         return False
         '''
 
-    def _projected_to_edges_projection_set(self, projected):
-        edges_projection_set = set()
+    def _create_edges_hash_keys(self, projected):
+        edges_hash_keys = set()
         if projected is None:
-            return edges_projection_set
+            return edges_hash_keys
 
         pdfs = list()
         for pdf in projected:
             if pdf is None:
-                return edges_projection_set
+                return edges_hash_keys
             pdfs.append(pdf)
 
         while True:
             projected_edges, g, edge = self._collect_projected_edges(pdfs)
-            set_of_proj_edges = frozenset(projected_edges)
-            edges_projection_set.add(set_of_proj_edges)
+            edge_hash_key = frozenset(projected_edges)
+            edges_hash_keys.add(edge_hash_key)
 
             pdfs_temp = list()
             for pdf in pdfs:
                 if pdf.prev is None:
-                    return edges_projection_set
+                    return edges_hash_keys
                 pdfs_temp.append(pdf.prev)
             pdfs = pdfs_temp
 
-        return edges_projection_set
+        return edges_hash_keys
 
 
 
-    def _add_closed_graph_to_projection_set(self, g):
-        for edges_projection_set in g.edges_projection_sets:
-            if edges_projection_set not in self.edge_projection_sets_closed_graphs:
-                self.edge_projection_sets_closed_graphs[edges_projection_set] = list()
-            self.edge_projection_sets_closed_graphs[edges_projection_set].append(g)
+    def _add_closed_graph(self, g):
+        for edge_hash_key in g.edges_hash_keys:
+            if edge_hash_key not in self.closed_graphs_hash_table:
+                self.closed_graphs_hash_table[edge_hash_key] = list()
+            self.closed_graphs_hash_table[edge_hash_key].append(g)
 
 
     def _collect_projected_edges(self, projected):

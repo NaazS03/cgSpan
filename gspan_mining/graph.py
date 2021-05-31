@@ -232,7 +232,7 @@ class DatabaseGraph(Graph):
 
 class FrequentGraph(Graph):
     def __init__(self,
-                 edges_projection_sets,
+                 edges_hash_keys,
                  where_graphs,
                  where_projections,
                  pdfs_edges_projection_list,
@@ -242,7 +242,7 @@ class FrequentGraph(Graph):
                  is_undirected=True,
                  eid_auto_increment=True):
         super().__init__(gid, is_undirected, eid_auto_increment)
-        self.edges_projection_sets = edges_projection_sets
+        self.edges_hash_keys = edges_hash_keys
         self.where_graphs = where_graphs
         self.support_graphs = len(where_graphs)
         self.where_projections = sorted(where_projections)

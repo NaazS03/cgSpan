@@ -87,10 +87,10 @@ class DFScode(list):
         g.dfs_code_edges_directions = self.edges_directions()
         return g
 
-    def to_frequent_graph(self, graph_edges_projection_sets, where_graphs, where_projections,
-                          projected_edges_lists,  DFScode, example_gid, gid=VACANT_GRAPH_ID, is_undirected=True):
+    def to_frequent_graph(self, edges_hash_keys, where_graphs, where_projections,
+                          projected_edges_lists, DFScode, example_gid, gid=VACANT_GRAPH_ID, is_undirected=True):
         """Construct a graph according to the dfs code."""
-        g = FrequentGraph(graph_edges_projection_sets,
+        g = FrequentGraph(edges_hash_keys,
                           where_graphs,
                           where_projections,
                           projected_edges_lists,
