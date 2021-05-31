@@ -166,27 +166,3 @@ class DFScode(list):
             [dfsedge.to for dfsedge in self]
         ))
 
-    def set_root_minimal_labels(self):
-        if len(self) == 0:
-            return
-        dfsedge = self[0];
-        frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
-        dfsedge.vevlb = ('0', '0', vlb2)
-        return vlb1, elb
-
-    def restore_root_original_labels(self, vlb1, elb):
-        if len(self) == 0:
-            return
-        dfsedge = self[0];
-        frm, to, (min_vlb1, min_elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
-        dfsedge.vevlb = (vlb1, elb, vlb2)
-        return
-
-    def vertex_labels(self):
-        vlbs = dict()
-        for e in self:
-            if e.vevlb[0] != VACANT_VERTEX_LABEL:
-                vlbs[e.frm] = e.vevlb[0]
-            if e.vevlb[2] != VACANT_VERTEX_LABEL:
-                vlbs[e.to] = e.vevlb[2]
-        return vlbs

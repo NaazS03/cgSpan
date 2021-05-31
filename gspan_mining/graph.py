@@ -246,7 +246,6 @@ class FrequentGraph(Graph):
         self.where_graphs = where_graphs
         self.support_graphs = len(where_graphs)
         self.where_projections = sorted(where_projections)
-        self.where_projections_set = set(where_projections)
         self.support_projections = len(where_projections)
         self.pdfs_edges_projection_list = pdfs_edges_projection_list
         self.DFScode = DFScode

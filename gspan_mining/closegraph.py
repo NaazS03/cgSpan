@@ -36,11 +36,6 @@ def record_timestamp(func):
     return deco
 
 
-class CloseGraphMode(enum.Enum):
-    Normal = 1
-    EarlyTerminationFailure = 2
-
-
 class SupportMode(enum.Enum):
     Projections = 1
     Graphs = 2
@@ -143,7 +138,6 @@ class closeGraph(object):
         self._visualize = visualize
         self._where = where
         self._support_mode = support_mode
-        self._mode = CloseGraphMode.Normal
         self.timestamps = dict()
         if self._max_num_vertices < self._min_num_vertices:
             print('Max number of vertices can not be smaller than '
@@ -300,8 +294,6 @@ class closeGraph(object):
             self._subgraph_mining(root[vevlb])
             self._DFScode.pop()
 
-        self._mode = CloseGraphMode.EarlyTerminationFailure
-
 
     def _get_support_graphs(self, projected):
         return len(set([pdfs.gid for pdfs in projected]))
@@ -373,10 +365,7 @@ class closeGraph(object):
             if self._is_undirected:
                 if e1.elb < e.elb or (
                         e1.elb == e.elb and
-                        g.vertices[e1.to].vlb <= g.vertices[e2.to].vlb) or (
-                        self._mode == CloseGraphMode.EarlyTerminationFailure
-                        and dfs_code_root_eid is not None
-                        and e1.eid == dfs_code_root_eid):
+                        g.vertices[e1.to].vlb <= g.vertices[e2.to].vlb):
                     return e
             else:
                 if g.vertices[e1.frm].vlb < g.vertices[e2.to].vlb or (
@@ -388,7 +377,7 @@ class closeGraph(object):
     def _get_forward_pure_edges(self, g, rm_edge, min_vlb, history):
         result = []
         for to, e in g.vertices[rm_edge.to].edges.items():
-            if (min_vlb <= g.vertices[e.to].vlb or self._mode == CloseGraphMode.EarlyTerminationFailure) and (
+            if (min_vlb <= g.vertices[e.to].vlb) and (
                     not history.has_vertex(e.to)):
                 result.append(e)
         return result
@@ -399,13 +388,10 @@ class closeGraph(object):
         for to, e in g.vertices[rm_edge.frm].edges.items():
             new_to_vlb = g.vertices[to].vlb
             if (rm_edge.to == e.to or
-                    (min_vlb > new_to_vlb and self._mode != CloseGraphMode.EarlyTerminationFailure) or
+                    (min_vlb > new_to_vlb) or
                     history.has_vertex(e.to)):
                 continue
             if rm_edge.elb < e.elb or (
-                    self._mode == CloseGraphMode.EarlyTerminationFailure
-                    and dfs_code_root_eid is not None
-                    and rm_edge.eid == dfs_code_root_eid) or (
                     rm_edge.elb == e.elb and
                     to_vlb <= new_to_vlb):
                 result.append(e)
@@ -693,8 +679,6 @@ class closeGraph(object):
             g = self.graphs[p.gid]
             history = History(g, p)
             dfs_code_root_eid = None
-            if self._mode == CloseGraphMode.EarlyTerminationFailure:
-                dfs_code_root_eid = p._root_eid()
             # backward
             for rmpath_i in rmpath[::-1]:
                 e = self._get_backward_edge(g,
