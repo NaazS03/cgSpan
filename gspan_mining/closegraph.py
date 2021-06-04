@@ -793,11 +793,17 @@ class closeGraph(object):
         forward_etf_path = None
         backward_etf_path = None
 
+        histories = dict()
+
         # type 1
         if self._DFScode[-1].to > self._DFScode[-1].frm:
-            for p in projected:
+            for p_i, p in enumerate(projected):
                 g = self.graphs[p.gid]
-                history = History(g, p)
+                if (g.gid, p_i) in histories:
+                    history = histories[(g.gid, p_i)]
+                else:
+                    history = History(g, p)
+                    histories[(g.gid, p_i)] = history
 
                 g_rmpath_vertices = set()
                 for rmpath_i in rmpath:
@@ -842,9 +848,13 @@ class closeGraph(object):
                     rmpath_j = rmpath[j]
                     v_frm = self._DFScode[rmpath_j].frm
 
-                    for p in projected:
+                    for p_i, p in enumerate(projected):
                         g = self.graphs[p.gid]
-                        history = History(g, p)
+                        if (g.gid, p_i) in histories:
+                            history = histories[(g.gid, p_i)]
+                        else:
+                            history = History(g, p)
+                            histories[(g.gid, p_i)] = history
 
                         dfs_to_g_vertices = dict()
                         g_to_dfs_vertices = dict()
@@ -890,9 +900,13 @@ class closeGraph(object):
         if self._DFScode[-1].to > self._DFScode[-1].frm and len(rmpath) > 2 \
                 and self._DFScode[rmpath[-1]].vevlb[1] == self._DFScode[rmpath[-2]].vevlb[1] \
                 and self._DFScode[rmpath[-1]].vevlb[2] == self._DFScode[rmpath[-2]].vevlb[2]:
-            for p in projected:
+            for p_i, p in enumerate(projected):
                 g = self.graphs[p.gid]
-                history = History(g, p)
+                if (g.gid, p_i) in histories:
+                    history = histories[(g.gid, p_i)]
+                else:
+                    history = History(g, p)
+                    histories[(g.gid, p_i)] = history
 
                 g_rmpath_first_vertex = history.edges[rmpath[-1]].frm
 
@@ -951,9 +965,13 @@ class closeGraph(object):
                     else:
                         vlb = self._DFScode[rmpath[i+1]].vevlb[2]
 
-                for p in projected:
+                for p_i, p in enumerate(projected):
                     g = self.graphs[p.gid]
-                    history = History(g, p)
+                    if (g.gid, p_i) in histories:
+                        history = histories[(g.gid, p_i)]
+                    else:
+                        history = History(g, p)
+                        histories[(g.gid, p_i)] = history
 
                     for to, e in g.vertices[history.edges[rmpath_i].to].edges.items():
                         if e.elb != elb:
