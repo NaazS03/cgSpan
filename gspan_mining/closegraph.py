@@ -35,11 +35,6 @@ def record_timestamp(func):
 
     return deco
 
-
-class SupportMode(enum.Enum):
-    Projections = 1
-    Graphs = 2
-
 class PDFS(object):
     """PDFS class."""
 
@@ -116,8 +111,7 @@ class closeGraph(object):
                  is_undirected=True,
                  verbose=False,
                  visualize=False,
-                 where=False,
-                 support_mode=SupportMode.Projections):
+                 where=False):
         """Initialize closeGraph instance."""
         self._database_file_name = database_file_name
         self.graphs = dict()
@@ -128,7 +122,6 @@ class closeGraph(object):
         self._max_num_vertices = max_num_vertices
         self._DFScode = DFScode()
         self._support = 0
-        self._frequent_size1_subgraphs = list()
         # Include subgraphs with
         # any num(but >= 2, <= max_num_vertices) of vertices.
         self._frequent_subgraphs = list()
@@ -137,7 +130,6 @@ class closeGraph(object):
         self._verbose = verbose
         self._visualize = visualize
         self._where = where
-        self._support_mode = support_mode
         self.timestamps = dict()
         if self._max_num_vertices < self._min_num_vertices:
             print('Max number of vertices can not be smaller than '
@@ -261,9 +253,6 @@ class closeGraph(object):
                 g = Graph(gid=next(self._counter),
                           is_undirected=self._is_undirected)
                 g.add_vertex(0, vlb)
-                self._frequent_size1_subgraphs.append(g)
-                # if self._min_num_vertices <= 1:
-                # self._report_size1(g, support=cnt)
             else:
                 continue
         if self._min_num_vertices > 1:
@@ -323,9 +312,7 @@ class closeGraph(object):
             return
         self._frequent_subgraphs.append(g)
         display_str = g.display()
-        # print('\nSupport: {}'.format(self._support))
-        support = g.support_projections if self._support_mode == SupportMode.Projections else g.support_graphs
-
+        support = g.support_graphs
         print('\nSupport: {}'.format(support))
 
         # Add some report info to pandas dataframe "self._report_df".
@@ -342,7 +329,7 @@ class closeGraph(object):
         if self._visualize:
             g.plot()
         if self._where:
-            where = g.where_projections if self._support_mode == SupportMode.Projections else g.where_graphs
+            where = g.where_graphs
             print('where: {}'.format(list(where)))
         print('\n-----------------\n')
 
@@ -750,12 +737,8 @@ class closeGraph(object):
         if early_termination_failure:
             return
 
-        has_equivalent_extended_occurrence = \
-            self._has_equivalent_extended_occurrence_projections(projected, rmpath, num_vertices,
-                                                                 maxtoc) if self._support_mode == SupportMode.Projections \
-                else self._has_equivalent_extended_occurrence_graphs(projected, list(reversed(range(rmpath[0] + 1))),
-                                                                     num_vertices, maxtoc)
-
+        has_equivalent_extended_occurrence = self._has_equivalent_extended_occurrence_projections(projected, rmpath, num_vertices,
+                                                                 maxtoc);
         if has_equivalent_extended_occurrence:
             return
 
@@ -1089,34 +1072,15 @@ class closeGraph(object):
         projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(
             projected)
 
-        edges_directions = self._DFScode.edges_directions()
-
         reject_early_termination = False
 
         for g in self.closed_graphs_hash_table[edge_hash_key]:
-            has_equivalent_occurrence, preserves_directions, isomorphism = g.check_equivalent_occurrence(support_projections,
+            has_equivalent_occurrence, isomorphism = g.check_equivalent_occurrence(support_projections,
                                                                                             where_projections,
-                                                                                            projected_edges_lists,
-                                                                                            edges_directions)
+                                                                                            projected_edges_lists)
             if not has_equivalent_occurrence:
                 continue
 
-            '''
-            max_dfs_index = 0
-            for index in isomorphism.values():
-                if len(g.DFScode) - index > max_dfs_index:
-                    max_dfs_index = len(g.DFScode) - index
-            dfs = g.DFScode[0:max_dfs_index]
-            for etfDFScode in self.etfDFScodes:
-                if len(etfDFScode) < max_dfs_index:
-                    continue
-
-                if dfs == etfDFScode[0:max_dfs_index]:
-                #if dfs == etfDFScode:
-                    termination_by_dfs = True
-                    break
-
-            '''
             reject_early_termination = self._reject_early_termination(g, isomorphism)
             if reject_early_termination:
                 break
@@ -1136,20 +1100,6 @@ class closeGraph(object):
         dfs = g.DFScode[0:max_dfs_index]
         is_in_trie = self.trie.search(dfs)
         return is_in_trie
-        '''
-        for etfDFScode in self.etfDFScodes:
-            if len(etfDFScode) < max_dfs_index:
-                continue
-
-            if dfs == etfDFScode[0:max_dfs_index]:
-                # if dfs == etfDFScode:
-                if not is_in_trie:
-                    print("!!!!!!!!!!!!!!!!!!!!!!!! trie error")
-                return True
-        if is_in_trie:
-            print("!!!!!!!!!!!!!!!!!!!!!!!! trie error")
-        return False
-        '''
 
     def _create_edges_hash_keys(self, projected):
         edges_hash_keys = set()

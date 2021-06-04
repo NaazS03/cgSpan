@@ -257,33 +257,15 @@ class FrequentGraph(Graph):
                     self.pdfs_edges_all.add(pdfs_edge)
 
 
-    def check_equivalent_occurrence(self, support_projections, where_projections, pdfs_edges_projection_list, edges_directions):
+    def check_equivalent_occurrence(self, support_projections, where_projections, pdfs_edges_projection_list):
         if self.support_projections < support_projections:
-            return False, False, None
+            return False, None
 
         if set(self.where_projections) != set(where_projections):
-            return False, False, None
-
-        '''
-        pdfs_edges_all = set()
-        for pdfs_edge_lists in pdfs_edges_projection_list.values():
-            for pdfs_edge_list in pdfs_edge_lists:
-                for pdfs_edge in pdfs_edge_list:
-                    pdfs_edges_all.add(pdfs_edge)
-
-        if not pdfs_edges_all.issubset(self.pdfs_edges_all):
-            return False, False, None
-        '''
-        #if not edges_projection_sets is None:
-        #    if not self.edges_projection_sets.keys().issuperset(edges_projection_sets.keys()):
-        #        return False
-
-        #if self.get_num_vertices() < num_vertices:
-        #    return False
+            return False, None
 
         possible_isomorphisms = self.find_possible_isomorphisms(pdfs_edges_projection_list[self.example_gid])
         isomorphism_found = False
-        preserves_directions = False
         isomorphism = None
         for isomorphism in possible_isomorphisms:
             for gid in pdfs_edges_projection_list.keys():
@@ -302,16 +284,11 @@ class FrequentGraph(Graph):
                         break
                 if isomorphism_found is False:
                     break
+
             if isomorphism_found is True:
-                preserves_directions = True
-                for other_index in isomorphism.keys():
-                    my_index = isomorphism[other_index]
-                    if self.dfs_code_edges_directions[my_index] != edges_directions[other_index]:
-                        preserves_directions = False
-                        break
                 break
 
-        return isomorphism_found, preserves_directions, isomorphism
+        return isomorphism_found, isomorphism
 
     def find_possible_isomorphisms(self, edges_projection_list):
         possible_isomorphisms = list()

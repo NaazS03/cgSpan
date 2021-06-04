@@ -84,7 +84,6 @@ class DFScode(list):
             if vlb2 != VACANT_VERTEX_LABEL:
                 g.add_vertex(to, vlb2)
             g.add_edge(AUTO_EDGE_ID, frm, to, elb)
-        g.dfs_code_edges_directions = self.edges_directions()
         return g
 
     def to_frequent_graph(self, edges_hash_keys, where_graphs, where_projections,
@@ -106,18 +105,7 @@ class DFScode(list):
             if vlb2 != VACANT_VERTEX_LABEL:
                 g.add_vertex(to, vlb2)
             g.add_edge(AUTO_EDGE_ID, frm, to, elb)
-        g.dfs_code_edges_directions = self.edges_directions()
         return g
-
-    def edges_directions(self):
-        directions = list()
-        for dfsedge in reversed(self):
-            frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
-            if frm < to:
-                directions.append(EdgeDirection.Forward)
-            else:
-                directions.append(EdgeDirection.Backward)
-        return directions
 
     def from_graph(self, g):
         """Build DFScode from graph `g`."""
