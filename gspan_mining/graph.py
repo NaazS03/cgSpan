@@ -256,6 +256,10 @@ class FrequentGraph(Graph):
                 for pdfs_edge in pdfs_edge_list:
                     self.pdfs_edges_all.add(pdfs_edge)
 
+    def is_supergraph_of_with_support_projections(self, g):
+        isomorphism_found, isomorphism = self.check_equivalent_occurrence(g.support_projections, g.where_projections,
+                                                g.pdfs_edges_projection_list)
+        return isomorphism_found
 
     def check_equivalent_occurrence(self, support_projections, where_projections, pdfs_edges_projection_list):
         if self.support_projections < support_projections:

@@ -1,4 +1,4 @@
-"""Implementation of closeGraph."""
+"""Implementation of gSpan."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -10,11 +10,17 @@ import itertools
 import time
 
 from graph import AUTO_EDGE_ID
-from graph import Graph
+from graph import Graph, DatabaseGraph, FrequentGraph, DFSlabel
 from graph import VACANT_GRAPH_ID
 from graph import VACANT_VERTEX_LABEL
 
 import pandas as pd
+
+import enum
+
+class SupportMode(enum.Enum):
+    Projections = 1
+    Graphs = 2
 
 
 def record_timestamp(func):
@@ -89,6 +95,27 @@ class DFScode(list):
         g = Graph(gid,
                   is_undirected=is_undirected,
                   eid_auto_increment=True)
+        for dfsedge in self:
+            frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
+            if vlb1 != VACANT_VERTEX_LABEL:
+                g.add_vertex(frm, vlb1)
+            if vlb2 != VACANT_VERTEX_LABEL:
+                g.add_vertex(to, vlb2)
+            g.add_edge(AUTO_EDGE_ID, frm, to, elb)
+        return g
+
+    def to_frequent_graph(self, graph_edges_projection_sets, where_graphs, where_projections,
+                            pdfs_edges_projection_sets, pdfs_edges_projection_lists, example_gid, gid=VACANT_GRAPH_ID, is_undirected=True):
+        """Construct a graph according to the dfs code."""
+        g = FrequentGraph(graph_edges_projection_sets,
+                          where_graphs,
+                          where_projections,
+                          pdfs_edges_projection_lists,
+                          self.copy(),
+                          example_gid,
+                          gid,
+                          is_undirected=is_undirected,
+                          eid_auto_increment=True)
         for dfsedge in self:
             frm, to, (vlb1, elb, vlb2) = dfsedge.frm, dfsedge.to, dfsedge.vevlb
             if vlb1 != VACANT_VERTEX_LABEL:
@@ -180,7 +207,7 @@ class History(object):
 
 
 class gSpan(object):
-    """`closeGraph` algorithm."""
+    """`gSpan` algorithm."""
 
     def __init__(self,
                  database_file_name,
@@ -191,8 +218,10 @@ class gSpan(object):
                  is_undirected=True,
                  verbose=False,
                  visualize=False,
-                 where=False):
-        """Initialize closeGraph instance."""
+                 where=False,
+                 support_mode=SupportMode.Projections):
+        """Initialize gSpan instance."""
+        self._frequent_subgraphs = list()
         self._database_file_name = database_file_name
         self.graphs = dict()
         self._max_ngraphs = max_ngraphs
@@ -217,6 +246,7 @@ class gSpan(object):
                   'Set max_num_vertices = min_num_vertices.')
             self._max_num_vertices = self._min_num_vertices
         self._report_df = pd.DataFrame()
+        self._support_mode = support_mode
 
     def time_stats(self):
         """Print stats of time."""
@@ -250,9 +280,9 @@ class gSpan(object):
                         tgraph = None
                     if cols[-1] == '-1' or graph_cnt >= self._max_ngraphs:
                         break
-                    tgraph = Graph(graph_cnt,
-                                   is_undirected=self._is_undirected,
-                                   eid_auto_increment=True)
+                    tgraph = DatabaseGraph(graph_cnt,
+                                           is_undirected=self._is_undirected,
+                                           eid_auto_increment=True)
                 elif cols[0] == 'v':
                     tgraph.add_vertex(cols[1], cols[2])
                 elif cols[0] == 'e':
@@ -296,7 +326,7 @@ class gSpan(object):
 
     @record_timestamp
     def run(self):
-        """Run the closeGraph algorithm."""
+        """Run the gSpan algorithm."""
         self._read_graphs()
         self._generate_1edge_frequent_subgraphs()
         if self._max_num_vertices < 2:
@@ -315,30 +345,40 @@ class gSpan(object):
             self._subgraph_mining(projected)
             self._DFScode.pop()
 
-    def _get_support(self, projected):
+    def _get_support_graphs(self, projected):
         return len(set([pdfs.gid for pdfs in projected]))
+
+    def _get_where_graphs(self, projected):
+        return set([pdfs.gid for pdfs in projected])
+
+    def _get_support_projections(self, projected):
+        return len(list([pdfs.gid for pdfs in projected]))
+
+    def _get_where_projections(self, projected):
+        return list([pdfs.gid for pdfs in projected])
 
     def _report_size1(self, g, support):
         g.display()
         print('\nSupport: {}'.format(support))
         print('\n-----------------\n')
 
-    def _report(self, projected):
-        self._frequent_subgraphs.append(copy.copy(self._DFScode))
-        if self._DFScode.get_num_vertices() < self._min_num_vertices:
+    def _report(self, g):
+        if g.get_num_vertices() < self._min_num_vertices:
             return
-        g = self._DFScode.to_graph(gid=next(self._counter),
-                                   is_undirected=self._is_undirected)
+        self._frequent_subgraphs.append(g)
         display_str = g.display()
-        print('\nSupport: {}'.format(self._support))
+        # print('\nSupport: {}'.format(self._support))
+        support = g.support_graphs
+
+        print('\nSupport: {}'.format(support))
 
         # Add some report info to pandas dataframe "self._report_df".
         self._report_df = self._report_df.append(
             pd.DataFrame(
                 {
-                    'support': [self._support],
+                    'support': support,  # [self._support],
                     'description': [display_str],
-                    'num_vert': self._DFScode.get_num_vertices()
+                    'num_vert': g.get_num_vertices()
                 },
                 index=[int(repr(self._counter)[6:-1])]
             )
@@ -346,7 +386,8 @@ class gSpan(object):
         if self._visualize:
             g.plot()
         if self._where:
-            print('where: {}'.format(list(set([p.gid for p in projected]))))
+            where = g.where_projections if self._support_mode == SupportMode.Projections else g.where_graphs
+            print('where: {}'.format(list(where)))
         print('\n-----------------\n')
 
     def _get_forward_root_edges(self, g, frm):
@@ -505,12 +546,26 @@ class gSpan(object):
         return res
 
     def _subgraph_mining(self, projected):
-        self._support = self._get_support(projected)
+        self._support = self._get_support_graphs(projected)
         if self._support < self._min_support:
             return
         if not self._is_min():
             return
-        self._report(projected)
+
+        graph_edges_projection_set = self._projected_to_edges_projection_set(projected)
+        where_graphs = self._get_where_graphs(projected)
+        where_projections = self._get_where_projections(projected)
+        projected_edges_sets, projected_edges_lists, max_gid = self._collect_projected_edges_all_pdfs(projected)
+        g = self._DFScode.to_frequent_graph(graph_edges_projection_set,
+                                            where_graphs,
+                                            where_projections,
+                                            projected_edges_sets,
+                                            projected_edges_lists,
+                                            max_gid,
+                                            gid=next(self._counter),
+                                            is_undirected=self._is_undirected)
+        # g._dfscode = copy.copy(self._DFScode) # delete later
+        self._report(g)
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()
@@ -576,3 +631,76 @@ class gSpan(object):
             self._DFScode.pop()
 
         return self
+
+    def _projected_to_edges_projection_set(self, projected):
+        edges_projection_set = dict()
+        if projected is None:
+            return edges_projection_set
+
+        pdfs = list()
+        for pdf in projected:
+            if pdf is None:
+                return edges_projection_set
+            pdfs.append(pdf)
+
+        while True:
+            projected_edges, g, edge = self._collect_projected_edges(pdfs)
+            frmlbl, edgelbl, tolbl = g._get_DFSLabels(edge)
+            dfs_labels = DFSlabel(frmlbl=frmlbl, edgelbl=edgelbl, tolbl=tolbl)
+
+            # Update DFSlabels dictionary to reference new projected edge
+            set_of_proj_edges = frozenset(projected_edges)
+            if dfs_labels not in edges_projection_set:
+                set_of_sets = set()
+                set_of_sets.add(set_of_proj_edges)
+                # Structure of DFSlabels_dict is DFSlabels -> set(frozenset(ProjectedEdges))
+                edges_projection_set[dfs_labels] = set_of_sets
+            else:
+                set_of_sets = edges_projection_set[dfs_labels]
+                if set_of_proj_edges not in set_of_sets:
+                    set_of_sets.add(set_of_proj_edges)  # Add the new set to the dict
+
+            pdfs_temp = list()
+            for pdf in pdfs:
+                if pdf.prev is None:
+                    return edges_projection_set
+                pdfs_temp.append(pdf.prev)
+            pdfs = pdfs_temp
+
+        return edges_projection_set
+
+
+    def _collect_projected_edges_all_pdfs(self, projected):
+        max_gid = -1;
+        for pdfs in projected:
+            if pdfs.gid > max_gid:
+                max_gid = pdfs.gid
+
+        projected_edges_sets = dict()
+        projected_edges_lists = dict()
+
+        for pdfs in projected:
+            gid = pdfs.gid
+            if not gid in projected_edges_sets:
+                projected_edges_sets[gid] = set()
+                projected_edges_lists[gid] = list()
+
+            pdfs_projected = list()
+            while pdfs is not None:
+                enumerated_edge = self.graphs[pdfs.gid].enumerated_edges[pdfs.edge.eid]
+                pdfs_projected.append(enumerated_edge)
+                pdfs = pdfs.prev
+            projected_edges_lists[gid].append(pdfs_projected)
+            set_of_proj_edges = frozenset(pdfs_projected)
+            projected_edges_sets[gid].add(set_of_proj_edges)
+        return projected_edges_sets, projected_edges_lists, max_gid
+
+    def _collect_projected_edges(self, projected):
+        projected_edges = []
+        for pdfs in projected:
+            g = self.graphs[pdfs.gid]
+            edge = pdfs.edge
+            # new_proj_edge = ProjectedEdge(originalGraphId=pdfs.gid, edgeId=edge.eid)
+            enumerated_edge = self.graphs[pdfs.gid].enumerated_edges[edge.eid]
+            projected_edges.append(enumerated_edge)
+        return projected_edges, g, edge
