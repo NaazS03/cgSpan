@@ -1,6 +1,6 @@
 # <div align = center>cgSpan</div>
 
-**cgSpan** is an algorithm for mining maximal frequent subgraphs. This implementation of cgSpan
+**cgSpan** is an algorithm for mining closed frequent subgraphs. This implementation of cgSpan
 is built using an existing implementation for gSpan.
 
 **gSpan** is an algorithm for mining frequent subgraphs.
