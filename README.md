@@ -1,11 +1,11 @@
-# <div align = center>CloseGraph</div>
+# <div align = center>cgSpan</div>
 
-**CloseGraph** is an algorithm for mining maximal frequent subgraphs. This implementation of CloseGraph
+**cgSpan** is an algorithm for mining maximal frequent subgraphs. This implementation of cgSpan
 is built using an existing implementation for gSpan.
 
 **gSpan** is an algorithm for mining frequent subgraphs.
 
-This program implements CloseGraph with Python. The repository on GitHub is [https://github.com/NaazS03/CloseGraph](https://github.com/NaazS03/CloseGraph)
+This program implements cgSpan with Python. The repository on GitHub is [https://github.com/NaazS03/cgSpan](https://github.com/NaazS03/cgSpan)
 
 The gSpan implementation referenced by this program can be found on GitHub at [https://github.com/betterenvi/gSpan](https://github.com/betterenvi/gSpan).
 
@@ -18,11 +18,24 @@ This program supports **Python 3**.
 
 ##### Method 1
 
+Install this project using pip:
+```sh
+pip install cgspan-mining
+```
+
+##### Method 2
+
 First, clone the project:
 
 ```sh
-git clone https://github.com/NaazS03/CloseGraph
-cd CloseGraph
+git clone https://github.com/NaazS03/cgSpan.git
+cd cgSpan
+```
+
+You can ***optionally*** install this project as a third-party library so that you can run it under ***any*** path.
+
+```sh
+python setup.py install
 ```
 
 ### How to run
@@ -30,25 +43,25 @@ cd CloseGraph
 The command is:
 
 ```sh
-python -m gspan_mining [-s min_support] [-n num_graph] [-l min_num_vertices] [-u max_num_vertices] [-d True/False] [-v True/False] [-p True/False] [-w True/False] [-h] database_file_name 
+python -m cgspan_mining [-s min_support] [-n num_graph] [-l min_num_vertices] [-u max_num_vertices] [-v True/False] [-p True/False] [-w True/False] [-h] database_file_name 
 ```
 
 
 ##### Some examples
 
-- Read graph data from ./graphdata/graph.data, and mine undirected subgraphs given min support is 5000
+- Read graph data from ./graphdata/graph.data, and mine closed subgraphs given min support is 5000
 ```
-python -m gspan_mining -s 5000 ./graphdata/graph.data
+python -m cgspan_mining -s 5000 ./graphdata/graph.data
 ```
 
-- Read graph data from ./graphdata/graph.data, mine undirected subgraphs given min support is 5000, and visualize these frequent subgraphs(matplotlib and networkx are required)
+- Read graph data from ./graphdata/graph.data, mine closed subgraphs given min support is 5000, and visualize these frequent subgraphs(matplotlib and networkx are required)
 ```
-python -m gspan_mining -s 5000 -p True ./graphdata/graph.data
+python -m cgspan_mining -s 5000 -p True ./graphdata/graph.data
 ```
 
 - Print help info
 ```
-python -m gspan_mining -h
+python -m cgspan_mining -h
 ```
 
 ### Reference
