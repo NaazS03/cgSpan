@@ -39,12 +39,6 @@ parser.add_argument(
          'default inf'
 )
 parser.add_argument(
-    '-d', '--directed',
-    type=str2bool,
-    default=False,
-    help='bool, run for directed graphs, default off, i.e. undirected graphs'
-)
-parser.add_argument(
     '-v', '--verbose',
     type=str2bool,
     default=False,

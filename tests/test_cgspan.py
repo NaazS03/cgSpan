@@ -1,5 +1,5 @@
 import unittest
-from .cgspan import cgSpan
+from cgspan_mining.cgspan import cgSpan
 
 class cgSpanTests(unittest.TestCase):
     @classmethod

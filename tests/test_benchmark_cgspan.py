@@ -1,5 +1,5 @@
 import unittest
-from closegraph import closeGraph
+from cgspan_mining.cgspan import cgSpan
 
 class CompoundBenchmarkTests(unittest.TestCase):
     """
@@ -27,7 +27,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.04
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -42,7 +42,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -57,7 +57,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.06
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -72,7 +72,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.07
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -87,7 +87,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.08
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -102,7 +102,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.09
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -117,7 +117,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.1
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -132,7 +132,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 7
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -146,7 +146,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 12
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -160,7 +160,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 17
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -174,7 +174,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 22
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -188,7 +188,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 27
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -202,7 +202,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 32
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -216,7 +216,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 37
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -230,7 +230,7 @@ class CompoundBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Coumpound_422.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 42
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -265,7 +265,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.03
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -280,7 +280,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.04
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -295,7 +295,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -310,7 +310,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.06
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -325,7 +325,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.07
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -340,7 +340,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.08
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -355,7 +355,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.09
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -370,7 +370,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.1
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -386,7 +386,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.45
         min_size_graph = 2
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -406,7 +406,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 7
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -420,7 +420,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 12
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -434,7 +434,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 17
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -448,7 +448,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 22
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -462,7 +462,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 27
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
@@ -476,7 +476,7 @@ class ChemicalBenchmarkTests(unittest.TestCase):
         file_name = "../graphdata/benchmark_tests/Chemical_340.txt"
         supp = graph_dataset_size * 0.05
         min_size_graph = 32
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name=file_name,
             min_support=supp,
             min_num_vertices=min_size_graph
