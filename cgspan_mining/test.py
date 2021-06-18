@@ -1,7 +1,7 @@
 import unittest
-from closegraph import closeGraph
+from .cgspan import cgSpan
 
-class CloseGraphTests(unittest.TestCase):
+class cgSpanTests(unittest.TestCase):
     @classmethod
     def setUpClass(self) -> None:
         self.f = open("unittestCloseGraphOutput.txt", "w")
@@ -22,7 +22,7 @@ class CloseGraphTests(unittest.TestCase):
         return results_as_tuples
 
     def test_case_00(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.0",
             min_support=2
         )
@@ -39,7 +39,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_01(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.1",
             min_support=2
         )
@@ -55,7 +55,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_02(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.2",
             min_support=2
         )
@@ -71,7 +71,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_03(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.3",
             min_support=2
         )
@@ -87,7 +87,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_04(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.4",
             min_support=2
         )
@@ -103,7 +103,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_05(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.5",
             min_support=2
         )
@@ -123,7 +123,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(True,True)
 
     def test_case_07(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.7",
             min_support=2
         )
@@ -140,7 +140,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_08(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.8",
             min_support=2
         )
@@ -157,7 +157,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions), sorted(results),"Atleast one solution was not found.")
 
     def test_case_09(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.9",
             min_support=2
         )
@@ -174,7 +174,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions),sorted(results),"Atleast one solution was not found.")
 
     def test_case_10(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.10",
             min_support=2
         )
@@ -191,7 +191,7 @@ class CloseGraphTests(unittest.TestCase):
         self.assertEqual(sorted(solutions), sorted(results), "Atleast one solution was not found.")
 
     def test_case_11(self):
-        cg = closeGraph(
+        cg = cgSpan(
             database_file_name="../graphdata/unit_test_data/graph.data.testcase.11",
             min_support=2
         )
