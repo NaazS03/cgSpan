@@ -10,17 +10,17 @@ import itertools
 import time
 import enum
 
-from graph import AUTO_EDGE_ID
-from graph import Graph
-from graph import VACANT_GRAPH_ID
-from graph import VACANT_VERTEX_LABEL
-from graph import DatabaseGraph
-from graph import FrequentGraph
-from graph import DFSlabel
-from graph import EdgeDirection
-from dfscode import DFSedge
-from dfscode import DFScode
-from trie import Trie
+from .graph import AUTO_EDGE_ID
+from .graph import Graph
+from .graph import VACANT_GRAPH_ID
+from .graph import VACANT_VERTEX_LABEL
+from .graph import DatabaseGraph
+from .graph import FrequentGraph
+from .graph import DFSlabel
+from .graph import EdgeDirection
+from .dfscode import DFSedge
+from .dfscode import DFScode
+from .trie import Trie
 
 import pandas as pd
 
