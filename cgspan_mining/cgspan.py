@@ -309,11 +309,11 @@ class cgSpan(object):
         print(line2)
 
     def _report(self, g):
+        self._frequent_subgraphs.append(g)
         if g.get_num_vertices() < self._min_num_vertices:
             return
         if g.report_gid is None:
             g.report_gid = next(self._report_counter)
-        self._frequent_subgraphs.append(g)
         display_str = g.display()
         support = g.support_graphs
         print('\nSupport: {}'.format(support))
