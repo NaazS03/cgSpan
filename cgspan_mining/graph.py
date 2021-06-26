@@ -255,6 +255,7 @@ class FrequentGraph(Graph):
             for pdfs_edge_list in pdfs_edge_lists:
                 for pdfs_edge in pdfs_edge_list:
                     self.pdfs_edges_all.add(pdfs_edge)
+        self.report_gid = None
 
     def is_supergraph_of_with_support_projections(self, g):
         isomorphism_found, isomorphism = self.check_equivalent_occurrence(g.support_projections, g.where_projections,
@@ -322,3 +323,23 @@ class FrequentGraph(Graph):
                 if len(isomorphism) == len(other_projected_edges):
                     possible_isomorphisms.append(isomorphism)
         return possible_isomorphisms
+
+    def display(self):
+        """Display the graph as text."""
+        display_str = ''
+        print('t # {}'.format(self.report_gid))
+        for vid in self.vertices:
+            print('v {} {}'.format(vid, self.vertices[vid].vlb))
+            display_str += 'v {} {} '.format(vid, self.vertices[vid].vlb)
+        for frm in self.vertices:
+            edges = self.vertices[frm].edges
+            for to in edges:
+                if self.is_undirected:
+                    if frm < to:
+                        print('e {} {} {}'.format(frm, to, edges[to].elb))
+                        display_str += 'e {} {} {} '.format(
+                            frm, to, edges[to].elb)
+                else:
+                    print('e {} {} {}'.format(frm, to, edges[to].elb))
+                    display_str += 'e {} {} {}'.format(frm, to, edges[to].elb)
+        return display_str

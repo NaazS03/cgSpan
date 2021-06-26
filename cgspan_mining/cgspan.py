@@ -127,6 +127,7 @@ class cgSpan(object):
         self._frequent_subgraphs = list()
         #self._early_termination_failure_causing_graphs = dict()
         self._counter = itertools.count()
+        self._report_counter = itertools.count()
         self._verbose = verbose
         self._visualize = visualize
         self._where = where
@@ -310,6 +311,8 @@ class cgSpan(object):
     def _report(self, g):
         if g.get_num_vertices() < self._min_num_vertices:
             return
+        if g.report_gid is None:
+            g.report_gid = next(self._report_counter)
         self._frequent_subgraphs.append(g)
         display_str = g.display()
         support = g.support_graphs
@@ -323,7 +326,7 @@ class cgSpan(object):
                     'description': [display_str],
                     'num_vert': g.get_num_vertices()
                 },
-                index=[int(repr(self._counter)[6:-1])]
+                index=[int(repr(self._report_counter)[6:-1])]
             )
         )
         if self._visualize:
