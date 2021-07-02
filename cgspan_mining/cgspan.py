@@ -122,10 +122,7 @@ class cgSpan(object):
         self._max_num_vertices = max_num_vertices
         self._DFScode = DFScode()
         self._support = 0
-        # Include subgraphs with
-        # any num(but >= 2, <= max_num_vertices) of vertices.
         self._frequent_subgraphs = list()
-        #self._early_termination_failure_causing_graphs = dict()
         self._counter = itertools.count()
         self._report_counter = itertools.count()
         self._verbose = verbose
@@ -142,7 +139,6 @@ class cgSpan(object):
         self._report_df_cumulative = pd.DataFrame()
         self.i = 0
         self._current_frequent_gid = -1
-        #self.etfDFScodes = list()
         self.trie = Trie()
 
     def time_stats(self):
@@ -154,11 +150,6 @@ class cgSpan(object):
                 self.timestamps[fn + '_out'] - self.timestamps[fn + '_in'],
                 2
             )
-
-        # print('Read:\t{} s'.format(time_deltas['_read_graphs']))
-        # print('Mine:\t{} s'.format(
-        #     time_deltas['run'] - time_deltas['_read_graphs']))
-        # print('Total:\t{} s'.format(time_deltas['run']))
 
         print('****************************')
         print('Time Statistics')
@@ -302,15 +293,12 @@ class cgSpan(object):
         line1 = '\nSupport: {}'.format(support)
         line2 = '\n-----------------\n'
 
-        # self._final_report += line1
-        # self._final_report += line2
-
         print(line1)
         print(line2)
 
     def _report(self, g):
         self._frequent_subgraphs.append(g)
-        if g.get_num_vertices() < self._min_num_vertices:
+        if g.get_num_vertices() < self._min_num_vertices or g.get_num_vertices() > self._max_num_vertices:
             return
         if g.report_gid is None:
             g.report_gid = next(self._report_counter)
@@ -419,8 +407,6 @@ class cgSpan(object):
         for i, p in enumerate(projected):
             g = self.graphs[p.gid]
             history = History(g, p)
-            if num_vertices >= self._max_num_vertices:
-                break
             edges = []
             for to, e in g.vertices[history.edges[rmpath[0]].to].edges.items():
                 if not history.has_vertex(e.to):
@@ -496,9 +482,6 @@ class cgSpan(object):
         for p in projected:
             g = self.graphs[p.gid]
             history = History(g, p)
-            if num_vertices >= self._max_num_vertices:
-                break
-
             # path forward
             checked_vertices = set()
             for path_i in path:
@@ -651,11 +634,7 @@ class cgSpan(object):
         self._DFScode.build_rmpath()
         early_termination, early_termination_failure = self._early_termination(projected)
         if early_termination:
-            #print(self.i, " early termination#")
             return
-        #else:
-        #    if early_termination_failure:
-        #        print(self.i, " early termination failure")
 
         num_vertices = self._DFScode.get_num_vertices()
         self._DFScode.build_rmpath()
@@ -681,8 +660,6 @@ class cgSpan(object):
                         (self._DFScode[rmpath_i].frm, e.elb)
                     ].append(PDFS(g.gid, e, p))
             # pure forward
-            if num_vertices >= self._max_num_vertices:
-                continue
             edges = self._get_forward_pure_edges(g,
                                                  history.edges[rmpath[0]],
                                                  min_vlb,
@@ -834,9 +811,7 @@ class cgSpan(object):
                     for pdfs in forward_root[(maxtoc, elb, vlb)]:
                         backward_root_etf[(elb, vlb)].add(pdfs.gid)
 
-                #if len(backward_root_etf[(elb, vlb)]) >= self._min_support:
                 if len(set(backward_root_etf[(elb, vlb)])) >= self._min_support:
-                    #self.etfDFScodes.append(self._DFScode.copy())
                     self.trie.insert(self._DFScode.copy())
                     return
 
@@ -893,9 +868,7 @@ class cgSpan(object):
                     for pdfs in forward_root[(rmpath_frm, elb, vlb)]:
                         backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)].add(pdfs.gid)
 
-                #if len(backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)]) >= self._min_support:
                 if len(set(backward_root_etf_rmpath_gaps[(rmpath_frm, elb, vlb)])) >= self._min_support:
-                    #self.etfDFScodes.append(self._DFScode.copy())
                     self.trie.insert(self._DFScode.copy())
                     return
 
@@ -933,9 +906,7 @@ class cgSpan(object):
                     for pdfs in forward_root[(maxtoc, elb, vlb)]:
                         backward_root_etf_rmpath_tail[(elb, vlb)].add(pdfs.gid)
 
-                #if len(backward_root_etf_rmpath_tail[(elb, vlb)]) >= self._min_support:
                 if len(set(backward_root_etf_rmpath_tail[(elb, vlb)])) >= self._min_support:
-                    #self.etfDFScodes.append(self._DFScode.copy())
                     self.trie.insert(self._DFScode.copy())
                     return
 
@@ -989,12 +960,10 @@ class cgSpan(object):
                         if history.has_vertex(e.to):
                             continue
 
-                        #self.etfDFScodes.append(self._DFScode.copy())
                         self.trie.insert(self._DFScode.copy())
                         return
 
         # type 5
-#        if backward_etf_path is None:
         dfs_codes = self._DFScode.build_all_dfs_codes()
         for dfs_code in dfs_codes[1:]:
             if dfs_code[-1].to < dfs_code[-1].frm:
@@ -1073,7 +1042,6 @@ class cgSpan(object):
                             if history.has_vertex(e.to):
                                 continue
 
-                            #self.etfDFScodes.append(self._DFScode.copy())
                             self.trie.insert(self._DFScode.copy())
                             return
 
@@ -1106,7 +1074,6 @@ class cgSpan(object):
             if reject_early_termination:
                 break
             early_termination = True
-            #print("dfs code ", self._DFScode, " terminated by gid ", g.gid, " early termination failure ", termination_by_dfs)
 
         if reject_early_termination:
             early_termination = False
