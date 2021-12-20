@@ -1,5 +1,16 @@
 # <div align = center>cgSpan</div>
 
+**cite** contains implementation for our [paper](https://arxiv.org/abs/2112.09573).  If you find this code useful in your research, please consider citing:
+
+    @misc{shaul2021cgspan,
+      title={cgSpan: Closed Graph-Based Substructure Pattern Mining}, 
+      author={Zevin Shaul and Sheikh Naaz},
+      year={2021},
+      eprint={2112.09573},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI}
+    }
+
 **cgSpan** is an algorithm for mining closed frequent subgraphs. This implementation of cgSpan
 is built using an existing implementation for gSpan.
 
@@ -50,16 +61,19 @@ python -m cgspan_mining [-s min_support] [-n num_graph] [-l min_num_vertices] [-
 ##### Some examples
 
 - Read graph data from ./graphdata/graph.data, and mine closed subgraphs given min support is 5000
+
 ```
 python -m cgspan_mining -s 5000 ./graphdata/graph.data
 ```
 
 - Read graph data from ./graphdata/graph.data, mine closed subgraphs given min support is 5000, and visualize these frequent subgraphs(matplotlib and networkx are required)
+
 ```
 python -m cgspan_mining -s 5000 -p True ./graphdata/graph.data
 ```
 
 - Print help info
+
 ```
 python -m cgspan_mining -h
 ```
