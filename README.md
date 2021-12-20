@@ -79,6 +79,10 @@ python -m cgspan_mining -h
 ```
 
 ### Reference
+- [cgSpan Paper](https://arxiv.org/pdf/2112.09573.pdf)
+
+cgSpan: Closed Graph-Based Substructure Pattern Mining, by Zevin Shaul and Sheikh Naaz
+
 - [CloseGraph Paper](https://sites.cs.ucsb.edu/~xyan/papers/CloseGraph.pdf)
 
 CloseGraph: Mining Close Frequent Graph Patterns, by X. Yan and J.Han.
